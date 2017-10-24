@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2015-2016, Chaos Software Ltd
+// Copyright (c) 2015-2017, Chaos Software Ltd
 //
 // V-Ray For Houdini
 //
@@ -16,12 +16,12 @@
 #include "vop_TexFalloff.h"
 #include "vop_TexRemap.h"
 #include "vop_TexGradRamp.h"
-#include "vop_TexLayered.h"
+#include "vop_TexLayeredMax.h"
 
 namespace VRayForHoudini {
 namespace VOP {
 
-#define TEX_DEF(PluginID) NODE_BASE_DEF("TEXTURE", PluginID)
+#define TEX_DEF(PluginID) NODE_BASE_DEF(TEXTURE, PluginID)
 
 TEX_DEF(BitmapBuffer)
 
@@ -38,7 +38,6 @@ TEX_DEF(TexBerconNoise)
 TEX_DEF(TexBerconTile)
 TEX_DEF(TexBerconWood)
 TEX_DEF(TexBezierCurve)
-TEX_DEF(TexBifrostVVMix)
 TEX_DEF(TexBillboardParticle)
 TEX_DEF(TexBitmap)
 TEX_DEF(TexBlend)
@@ -65,6 +64,7 @@ TEX_DEF(TexCondition)
 TEX_DEF(TexCondition2)
 TEX_DEF(TexCurvature)
 TEX_DEF(TexCustomBitmap)
+TEX_DEF(TexColorCorrect)
 TEX_DEF(TexDirt)
 TEX_DEF(TexDisplacacementRestrict)
 TEX_DEF(TexDistance)
@@ -88,7 +88,6 @@ TEX_DEF(TexIntToFloat)
 TEX_DEF(TexInterpLinear)
 TEX_DEF(TexInvert)
 TEX_DEF(TexInvertFloat)
-TEX_DEF(TexLayeredMax)
 TEX_DEF(TexLeather)
 TEX_DEF(TexLuminance)
 TEX_DEF(TexLut)
@@ -174,36 +173,12 @@ TEX_DEF(TexVertexColorDirect)
 TEX_DEF(TexVoxelData)
 TEX_DEF(TexWater)
 TEX_DEF(TexWood)
-TEX_DEF(TexXSIBitmap)
-TEX_DEF(TexXSICell)
-TEX_DEF(TexXSIColorBalance)
-TEX_DEF(TexXSIColorCorrection)
-TEX_DEF(TexXSIColorMix)
-TEX_DEF(TexXSIFabric)
-TEX_DEF(TexXSIFalloff)
-TEX_DEF(TexXSIFlagstone)
-TEX_DEF(TexXSIGradient)
-TEX_DEF(TexXSIHLSAdjust)
-TEX_DEF(TexXSIIntensity)
-TEX_DEF(TexXSILayered)
-TEX_DEF(TexXSIMulti)
-TEX_DEF(TexXSINormalMap)
-TEX_DEF(TexXSIRGBAKeyer)
-TEX_DEF(TexXSIRipple)
-TEX_DEF(TexXSIRock)
-TEX_DEF(TexXSIScalar2Color)
-TEX_DEF(TexXSIScalarInvert)
-TEX_DEF(TexXSISnow)
-TEX_DEF(TexXSIVein)
-TEX_DEF(TexXSIVertexColorLookup)
-TEX_DEF(TexXSIWeightmapColorLookup)
-TEX_DEF(TexXSIWeightmapLookup)
-TEX_DEF(TexXSIWood)
 TEX_DEF(TransformToTex)
 TEX_DEF(texRenderHair)
-TEX_DEF(texXSIColor2Alpha)
-TEX_DEF(texXSIColor2Vector)
 TEX_DEF(TexTriPlanar)
+
+TEX_DEF(ColorCorrect)
+TEX_DEF(ColorCorrection)
 
 } // namespace VOP
 } // namespace VRayForHoudini

@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2015-2016, Chaos Software Ltd
+// Copyright (c) 2015-2017, Chaos Software Ltd
 //
 // V-Ray For Houdini
 //
@@ -20,7 +20,7 @@
 namespace VRayForHoudini {
 namespace VOP {
 
-#define MTL_DEF(PluginID) NODE_BASE_DEF("MATERIAL", PluginID)
+#define MTL_DEF(PluginID) NODE_BASE_DEF(MATERIAL, PluginID)
 
 MTL_DEF(Mtl2Sided)
 MTL_DEF(MtlBump)

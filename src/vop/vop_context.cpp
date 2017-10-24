@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2015-2016, Chaos Software Ltd
+// Copyright (c) 2015-2017, Chaos Software Ltd
 //
 // V-Ray For Houdini
 //
@@ -237,7 +237,7 @@ void VOP::VRayVOPContext::register_operator_vrayenvcontext(OP_OperatorTable *tab
 
 void VOP::VRayVOPContext::register_operator_vrayrccontext(OP_OperatorTable *table)
 {
-	OP_Operator *op = new VOP_Operator("vray_render_channels", "V-Ray Render Channles",
+	OP_Operator *op = new VOP_Operator("vray_render_channels", "V-Ray Render Channels",
 									  VOP::VRayVOPContext::creator,
 									  templates,
 #if UT_MAJOR_VERSION_INT >= 16

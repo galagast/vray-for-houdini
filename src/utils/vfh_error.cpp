@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2015-2016, Chaos Software Ltd
+// Copyright (c) 2015-2017, Chaos Software Ltd
 //
 // V-Ray For Houdini
 //
@@ -7,6 +7,8 @@
 //
 // Full license text: https://github.com/ChaosGroup/vray-for-houdini/blob/master/LICENSE
 //
+
+#ifndef VASSERT_ENABLED
 
 #include "vfh_error.h"
 #include "vfh_log.h"
@@ -96,3 +98,5 @@ int Error::ErrorChaser::enable(bool val)
 
 	return true;
 }
+
+#endif

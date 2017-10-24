@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2015-2016, Chaos Software Ltd
+// Copyright (c) 2015-2017, Chaos Software Ltd
 //
 // V-Ray For Houdini
 //
@@ -16,15 +16,13 @@ using namespace VRayForHoudini;
 
 void VOP::GeomDisplacedMesh::setPluginType()
 {
-	pluginType = "GEOMETRY";
+	pluginType = VRayPluginType::GEOMETRY;
 	pluginID   = "GeomDisplacedMesh";
 }
 
 
 OP::VRayNode::PluginResult VOP::GeomDisplacedMesh::asPluginDesc(Attrs::PluginDesc &pluginDesc, VRayExporter &exporter, ExportContext *parentContext)
 {
-	Log::getLog().warning("OP::GeomDisplacedMesh::asPluginDesc()");
-
 	ECFnOBJNode fnObjContext(parentContext);
 	if (NOT(fnObjContext.isValid())) {
 		return OP::VRayNode::PluginResultError;
@@ -37,9 +35,8 @@ OP::VRayNode::PluginResult VOP::GeomDisplacedMesh::asPluginDesc(Attrs::PluginDes
 	//
 	const int &displace_type = evalInt("type", 0, 0.0);
 
-	pluginDesc.pluginAttrs.push_back(Attrs::PluginAttr("displace_2d",         int(displace_type == 1)));
-	pluginDesc.pluginAttrs.push_back(Attrs::PluginAttr("vector_displacement", int(displace_type == 2)));
-
+	pluginDesc.add(Attrs::PluginAttr("displace_2d",         int(displace_type == 1)));
+	pluginDesc.add(Attrs::PluginAttr("vector_displacement", int(displace_type == 2)));
 
 	const int idxTexCol = getInputFromName("displacement_tex_color");
 	OP_Node *texCol = getInput(idxTexCol);

@@ -1,4 +1,4 @@
-# Copyright (c) 2015-2016, Chaos Software Ltd
+# Copyright (c) 2015-2017, Chaos Software Ltd
 #
 # V-Ray For Houdini
 #
@@ -12,5 +12,7 @@ import hou
 # The node is passed in kwargs['node']
 node = kwargs['node']
 cnode = node.createNode("VRayNodeRenderChannelsContainer")
+
+cnode.setName("Out_container")
 
 node.layoutChildren()

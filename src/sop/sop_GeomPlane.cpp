@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2015-2016, Chaos Software Ltd
+// Copyright (c) 2015-2017, Chaos Software Ltd
 //
 // V-Ray For Houdini
 //
@@ -10,63 +10,49 @@
 
 #include "sop_GeomPlane.h"
 
+#include "gu_geomplaneref.h"
 
-#include <GEO/GEO_Point.h>
 #include <GU/GU_PrimPoly.h>
-
+#include <OP/OP_Options.h>
 
 using namespace VRayForHoudini;
 
-
-static PRM_Name prm_size_name("plane_size", "Viewport Size");
-
-
 void SOP::GeomPlane::setPluginType()
 {
-	pluginType = "GEOMETRY";
+	pluginType = VRayPluginType::GEOMETRY;
 	pluginID   = "GeomInfinitePlane";
 }
 
-
-void SOP::GeomPlane::addPrmTemplate(Parm::PRMList &prmTemplate)
-{
-	prmTemplate.addPrm(PRM_Template(PRM_FLT, 1, &prm_size_name, PRMoneDefaults));
-}
-
-
 OP_ERROR SOP::GeomPlane::cookMySop(OP_Context &context)
 {
-	Log::getLog().info("SOP::GeomPlane::cookMySop()");
+	const fpreal t = context.getTime();
 
-	if(error() < UT_ERROR_ABORT) {
-		gdp->clearAndDestroy();
+	gdp->stashAll();
+	
+	GU_PrimPacked *pack = GU_PrimPacked::build(*gdp, "GeomInfinitePlaneRef");
+	if (NOT(pack)) {
+		addWarning(SOP_MESSAGE, "Can't create packed primitive GeomInfinitePlaneRef");
+	}
+	else {
+		// Set the location of the packed primitive's point.
+		UT_Vector3 pivot(0, 0, 0);
+		pack->setPivot(pivot);
+		gdp->setPos3(pack->getPointOffset(0), pivot);
+
+		// Set the options on the primitive
+		OP_Options options;
+		for (int i = 0; i < getParmList()->getEntries(); ++i) {
+			const PRM_Parm &prm = getParm(i);
+			options.setOptionFromTemplate(this, prm, *prm.getTemplatePtr(), t);
+		}
+
+		pack->implementation()->update(options);
 	}
 
-	const float size = evalFloat(prm_size_name.getToken(), 0, 0.0);
-
-	GU_PrimPoly *poly = GU_PrimPoly::build(gdp, 4, GU_POLY_CLOSED, 0);
-
-	GA_Offset pOff = gdp->appendPoint();
-	gdp->setPos3(pOff, UT_Vector3(-size, 0.0f, -size));
-	poly->setVertexPoint(0, pOff);
-
-	pOff = gdp->appendPoint();
-	gdp->setPos3(pOff, UT_Vector3(-size, 0.0f,  size));
-	poly->setVertexPoint(1, pOff);
-
-	pOff = gdp->appendPoint();
-	gdp->setPos3(pOff, UT_Vector3( size, 0.0f,  size));
-	poly->setVertexPoint(2, pOff);
-
-	pOff = gdp->appendPoint();
-	gdp->setPos3(pOff, UT_Vector3( size, 0.0f, -size));
-	poly->setVertexPoint(3, pOff);
-
-	poly->reverse();
+	gdp->destroyStashed();
 
 	return error();
 }
-
 
 OP::VRayNode::PluginResult SOP::GeomPlane::asPluginDesc(Attrs::PluginDesc &pluginDesc, VRayExporter &exporter, ExportContext *parentContext)
 {

@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2015-2016, Chaos Software Ltd
+# Copyright (c) 2015-2017, Chaos Software Ltd
 #
 # V-Ray For Houdini
 #
@@ -8,10 +8,9 @@
 # Full license text: https://github.com/ChaosGroup/vray-for-houdini/blob/master/LICENSE
 #
 
+find_package(VRaySDK)
 
 macro(use_vray_sdk)
-	find_package(VRaySDK)
-
 	if(NOT VRaySDK_FOUND)
 		message(FATAL_ERROR "V-Ray SDK NOT found!\n"
 							"To specify V-Ray SDK search path, use one of the following options:\n"
@@ -20,9 +19,6 @@ macro(use_vray_sdk)
 							"or install V-Ray For Maya"
 							)
 	endif()
-
-	message(STATUS "Using V-Ray SDK include path: ${VRaySDK_INCLUDES}")
-	message(STATUS "Using V-Ray SDK library path: ${VRaySDK_LIBRARIES}")
 
 	if(WIN32)
 		# Both V-Ray SDK and HDK defines some basic types,
@@ -41,6 +37,9 @@ macro(use_vray_sdk)
 		add_definitions(-DCGR_HAS_VRAYSCENE)
 	endif()
 
+	if(WIN32)
+		set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /DVASSERT_ENABLED")
+	endif()
 endmacro()
 
 
@@ -57,26 +56,28 @@ macro(link_with_vray_sdk _name)
 		plugman_s
 		putils_s
 		vutils_s
-	)
-	list(APPEND VRAY_SDK_LIBS
 		jpeg_s
 		libpng_s
 		tiff_s
 	)
+
 	if(WIN32)
-		if(${HDK_MAJOR_VERSION} VERSION_GREATER "15")
+		if(HDK_MAJOR_VERSION VERSION_GREATER 15.0)
 			list(APPEND VRAY_SDK_LIBS ${HDK_QT_LIBS})
 		else()
 			list(APPEND VRAY_SDK_LIBS QtCore4)
 		endif()
+
 		list(APPEND VRAY_SDK_LIBS zlib_s)
 	endif()
+
 	if(CGR_HAS_VRSCENE)
 		list(APPEND VRAY_SDK_LIBS
 			treeparser_s
 			vrscene_s
 		)
 	endif()
+
 	target_link_libraries(${_name} ${VRAY_SDK_LIBS})
 endmacro()
 

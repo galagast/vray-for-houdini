@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2015-2016, Chaos Software Ltd
+// Copyright (c) 2015-2017, Chaos Software Ltd
 //
 // V-Ray For Houdini
 //
@@ -54,7 +54,7 @@ bool VOP::BRDFScanned::updateParmsFlags()
 
 void VOP::BRDFScanned::setPluginType()
 {
-	pluginType = "BRDF";
+	pluginType = VRayPluginType::BRDF;
 	pluginID   = "BRDFScanned";
 }
 

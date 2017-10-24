@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2015-2016, Chaos Software Ltd
+// Copyright (c) 2015-2017, Chaos Software Ltd
 //
 // V-Ray For Houdini
 //
@@ -87,8 +87,6 @@ public:
 	///         nullptr - json not found for given plugin ID
 	JsonTree *getTree(const std::string &pluginID);
 
-	/// Initialize settings pluginIDs
-	void init();
 	/// Check if we already loaded data from files
 	bool hasData() { return parsedData.size(); }
 	/// Load data from json files
@@ -101,35 +99,6 @@ private:
 
 	VfhDisableCopy(JsonPluginDescGenerator)
 } JsonPluginInfoParser;
-
-
-void JsonPluginDescGenerator::init()
-{
-	// Some compilers don't support initialization lists still.
-	// Move elsewhere...
-	//
-	// RenderSettingsPlugins.insert("SettingsRTEngine");
-
-	RenderSettingsPlugins.insert("SettingsOptions");
-	RenderSettingsPlugins.insert("SettingsColorMapping");
-	RenderSettingsPlugins.insert("SettingsDMCSampler");
-	RenderSettingsPlugins.insert("SettingsImageSampler");
-	RenderSettingsPlugins.insert("SettingsGI");
-	RenderSettingsPlugins.insert("SettingsIrradianceMap");
-	RenderSettingsPlugins.insert("SettingsLightCache");
-	RenderSettingsPlugins.insert("SettingsDMCGI");
-	RenderSettingsPlugins.insert("SettingsRaycaster");
-	RenderSettingsPlugins.insert("SettingsRegionsGenerator");
-	RenderSettingsPlugins.insert("SettingsOutput");
-	RenderSettingsPlugins.insert("SettingsCaustics");
-	RenderSettingsPlugins.insert("SettingsDefaultDisplacement");
-
-	RenderGIPlugins.insert("SettingsGI");
-	RenderGIPlugins.insert("SettingsLightCache");
-	RenderGIPlugins.insert("SettingsIrradianceMap");
-	RenderGIPlugins.insert("SettingsDMCGI");
-}
-
 
 void JsonPluginDescGenerator::parseData()
 {
@@ -206,7 +175,6 @@ static void makeSpaceSeparatedTitleCase(std::string &attrName)
 VRayPluginInfo* Parm::generatePluginInfo(const std::string &pluginID)
 {
 	if (!JsonPluginInfoParser.hasData()) {
-		JsonPluginInfoParser.init();
 		JsonPluginInfoParser.parseData();
 	}
 
@@ -497,6 +465,10 @@ VRayPluginInfo* Parm::generatePluginInfo(const std::string &pluginID)
 			else if (attrType == "BRDF") {
 				attrDesc.value.type = ParmType::ePlugin;
 				socketType = VOP_TYPE_BSDF;
+			}
+			else if (attrType == "MATERIAL") {
+				attrDesc.value.type = ParmType::ePlugin;
+				socketType = VOP_SURFACE_SHADER;
 			}
 			else if (attrType == "UVWGEN") {
 				attrDesc.value.type = ParmType::ePlugin;

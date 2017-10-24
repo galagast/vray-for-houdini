@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2015-2016, Chaos Software Ltd
+// Copyright (c) 2015-2017, Chaos Software Ltd
 //
 // V-Ray For Houdini
 //
@@ -17,15 +17,18 @@
 namespace VRayForHoudini {
 namespace SOP {
 
-class VRayProxy:
-		public SOP::NodeBase
+class VRayProxy
+	: public SOP::NodeBase
 {
 public:
-	/// Callback to add any custom parameters to our template list
-	/// @note called from Parm::generatePrmTemplate()
-	///       TODO : use corrsponding .ds file to configure GUI for this node
-	/// @param prmTemplate[out] - append your custom templates here
-	static void addPrmTemplate(Parm::PRMList &prmTemplate);
+	static PRM_Template* getPrmTemplate();
+
+	VRayProxy(OP_Network *parent, const char *name, OP_Operator *entry);
+	virtual ~VRayProxy() {}
+
+	/// Houdini callback to cook custom geometry for this node
+	/// @param context[in] - cook time
+	OP_ERROR cookMySop(OP_Context &context) VRAY_OVERRIDE;
 
 	/// Callback to clear cache for this node ("Reload Geometry" button in the GUI)
 	/// @param data - pointer to the node it was called on
@@ -36,30 +39,9 @@ public:
 	///        (ie if you changed any values) and 0 otherwise.
 	static int cbClearCache(void *data, int index, fpreal t, const PRM_Template* tplate);
 
-public:
-	VRayProxy(OP_Network *parent, const char *name, OP_Operator *entry);
-	virtual ~VRayProxy()
-	{ }
-
-	/// Houdini callback to cook custom geometry for this node
-	/// @param context[in] - cook time
-	virtual OP_ERROR cookMySop(OP_Context &context) VRAY_OVERRIDE;
-
-	/// Callback called by vfh exporter when exporting the node
-	/// @param pluginDesc[out] - dynamic map containing plugin (property, value) pairs
-	/// @param exporter - reference to main vfh exporter
-	/// @param parentContext - context in which this node is exported
-	///                        used to pass some data that will be needed during the export
-	/// @retval result of the export for this node
-	///         PluginResultSuccess - on success
-	///         PluginResultContinue - on success, but singnals that not all relevant properties have been added
-	///         PluginResultError- there has been an error
-	virtual PluginResult asPluginDesc(Attrs::PluginDesc &pluginDesc, VRayExporter &exporter, ExportContext *parentContext=nullptr) VRAY_OVERRIDE;
-
 protected:
 	/// Set custom plugin id and type for this node
-	virtual void setPluginType() VRAY_OVERRIDE;
-
+	void setPluginType() VRAY_OVERRIDE;
 }; // VRayProxy
 
 } // namespace SOP

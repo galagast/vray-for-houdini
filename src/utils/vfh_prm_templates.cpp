@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2015-2016, Chaos Software Ltd
+// Copyright (c) 2015-2017, Chaos Software Ltd
 //
 // V-Ray For Houdini
 //
@@ -10,11 +10,6 @@
 
 #include "vfh_prm_templates.h"
 #include "vfh_log.h"
-
-#include "vop/material/vop_MtlMulti.h"
-#include "vop/brdf/vop_BRDFLayered.h"
-#include "vop/texture/vop_TexLayered.h"
-#include "sop/sop_node_def.h"
 
 #include <OP/OP_Node.h>
 #include <OP/OP_SpareParms.h>
@@ -204,28 +199,11 @@ bool Parm::addPrmTemplateForPlugin(const std::string &pluginID, Parm::PRMList &p
 
 Parm::PRMList* Parm::generatePrmTemplate(const std::string &pluginID)
 {
-	typedef std::unordered_map< std::string, PRMList > PRMListMap;
+	typedef std::unordered_map<std::string, PRMList> PRMListMap;
 	static PRMListMap prmListMap;
 
 	if (prmListMap.count(pluginID) == 0) {
 		PRMList &prmList = prmListMap[pluginID];
-
-		if (pluginID == "BRDFLayered") {
-			VOP::BRDFLayered::addPrmTemplate(prmList);
-		}
-		else if (pluginID == "TexLayered") {
-			VOP::TexLayered::addPrmTemplate(prmList);
-		}
-		else if (pluginID == "MtlMulti") {
-			VOP::MtlMulti::addPrmTemplate(prmList);
-		}
-		else if (pluginID == "GeomPlane") {
-			SOP::GeomPlane::addPrmTemplate(prmList);
-		}
-		else if (pluginID == "GeomMeshFile") {
-			SOP::VRayProxy::addPrmTemplate(prmList);
-		}
-
 		addPrmTemplateForPlugin(pluginID, prmList);
 	}
 
@@ -430,13 +408,16 @@ Parm::PRMList& Parm::PRMList::addFolder(const char *label)
 }
 
 
-Parm::PRMList& Parm::PRMList::addFromFile(const char *filepath)
+Parm::PRMList& Parm::PRMList::addFromFile(const char *filepath, const char *includePath)
 {
 	if (!UTisstring(filepath)) {
 		return *this;
 	}
 
 	DS_Stream stream(filepath);
+	if (includePath && *includePath) {
+		stream.addIncludePath(includePath);
+	}
 
 	// need to keep all the pages as myTemplate will have references to it
 	std::shared_ptr< PRM_ScriptGroup > group = std::make_shared< PRM_ScriptGroup >(nullptr);
@@ -444,12 +425,13 @@ Parm::PRMList& Parm::PRMList::addFromFile(const char *filepath)
 	int res = -1;
 	while ((res = stream.getOpenBrace()) > 0) {
 		PRM_ScriptPage *currentPage = new PRM_ScriptPage();
-		res = currentPage->parse(stream, false, nullptr, false);
+
+		res = currentPage->parse(stream, false, nullptr, true, true);
 		if (res > 0) {
 			group->addPage(currentPage);
 		}
 		else {
-			Log::getLog().warning("Parse error in file %s.", filepath);
+			Log::getLog().error("Parse error in file %s.", filepath);
 			delete currentPage;
 		}
 	}

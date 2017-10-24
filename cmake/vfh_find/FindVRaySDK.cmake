@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2015-2016, Chaos Software Ltd
+# Copyright (c) 2015-2017, Chaos Software Ltd
 #
 # V-Ray For Houdini
 #
@@ -17,17 +17,12 @@ if(VRAYSDK_PATH)
 else()
 	# no V-Ray SDK root path is passed to cmake
 	if(SDK_PATH)
-		# if vfh sdk path is given use it to deduce V-Ray SDK root path based on version
-		if(NOT VRAYSDK_VERSION)
-			message(WARNING "V-Ray SDK version NOT specified")
-			set(_vraysdk_root "")
-		else()
-			message(STATUS "V-Ray SDK version = ${VRAYSDK_VERSION}")
-			set(_vraysdk_root "${SDK_PATH}/vraysdk/vraysdk${VRAYSDK_VERSION}")
+		set(_vraysdk_root "${SDK_PATH}/vraysdk")
+		if(WIN32)
+			set(_vraysdk_root "${_vraysdk_root}/${HDK_RUNTIME}")
 		endif()
 	else()
 		# otherwise search for V-Ray for Maya default installation path
-
 		set(_maya_versions "2017;2016;2015;2014")
 		foreach(_maya_version ${_maya_versions})
 			if(WIN32)
@@ -52,7 +47,7 @@ else()
 endif()
 
 
-message(STATUS "V-Ray SDK search path = ${_vraysdk_root}")
+message(STATUS "V-Ray SDK search path: ${_vraysdk_root}")
 
 
 # check if path exists
@@ -131,4 +126,7 @@ if(NOT VRaySDK_FOUND)
 
 	set(VRaySDK_INCLUDES VRaySDK_INCLUDES-NOTFOUND)
 	set(VRaySDK_LIBRARIES VRaySDK_LIBRARIES-NOTFOUND)
+else()
+	message_array("Using V-Ray SDK include path" VRaySDK_INCLUDES)
+	message_array("Using V-Ray SDK library path" VRaySDK_LIBRARIES)
 endif()

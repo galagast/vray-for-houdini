@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2015-2016, Chaos Software Ltd
+// Copyright (c) 2015-2017, Chaos Software Ltd
 //
 // V-Ray For Houdini
 //
@@ -9,100 +9,100 @@
 //
 
 #include "vfh_exporter.h"
+#include "vfh_op_utils.h"
+#include "vfh_attr_utils.h"
+
 #include "vop/material/vop_mtl_def.h"
 
 #include <SHOP/SHOP_Node.h>
 #include <VOP/VOP_ParmGenerator.h>
 #include <OP/OP_Options.h>
 
-
 using namespace VRayForHoudini;
-
 
 void VRayExporter::RtCallbackSurfaceShop(OP_Node *caller, void *callee, OP_EventType type, void *data)
 {
+	if (!csect.tryEnter())
+		return;
+
 	VRayExporter &exporter = *reinterpret_cast<VRayExporter*>(callee);
 
-	Log::getLog().info("RtCallbackSurfaceShop: %s from \"%s\"",
+	Log::getLog().debug("RtCallbackSurfaceShop: %s from \"%s\"",
 					   OPeventToString(type), caller->getName().buffer());
 
-	if (type == OP_INPUT_REWIRED && caller->error() < UT_ERROR_ABORT) {
-		UT_String inputName;
-		const int idx = reinterpret_cast<uintptr_t>(data);
-		caller->getInputName(inputName, idx);
-
-		if (inputName.equal("Material")) {
-			SHOP_Node *shop_node = caller->getParent()->castToSHOPNode();
-			if (shop_node) {
-				UT_String shopPath;
-				shop_node->getFullPath(shopPath);
-
-				exporter.exportMaterial(*shop_node);
-			}
-		}
+	if (type == OP_INPUT_REWIRED) {
+		exporter.exportMaterial(caller);
 	}
 	else if (type == OP_NODE_PREDELETE) {
-		exporter.delOpCallback(caller, VRayExporter::RtCallbackSurfaceShop);
+		exporter.delOpCallback(caller, RtCallbackSurfaceShop);
 	}
+
+	csect.leave();
 }
 
+VRay::Plugin VRayExporter::exportMaterial(VOP_Node *vopNode)
+{
+	if (!vopNode) {
+		return VRay::Plugin();
+	}
 
-VRay::Plugin VRayExporter::exportMaterial(SHOP_Node &shop_node)
+	VRay::Plugin material = exportVop(vopNode);
+
+	const VOP_Type vopType = vopNode->getShaderType();
+	if (vopType == VOP_TYPE_BSDF) {
+		// Wrap BRDF into MtlSingleBRDF for RT GPU to work properly.
+		Attrs::PluginDesc mtlPluginDesc(getPluginName(vopNode, "MtlSingle"), "MtlSingleBRDF");
+		mtlPluginDesc.addAttribute(Attrs::PluginAttr("brdf", material));
+		VRay::ValueList sceneName(1);
+		sceneName[0] = VRay::Value(vopNode->getName().buffer());
+		mtlPluginDesc.addAttribute(Attrs::PluginAttr("scene_name", sceneName));
+		material = exportPlugin(mtlPluginDesc);
+	}
+
+	if (material && isIPR()) {
+		// Wrap material into MtlRenderStats to always have the same material name.
+		// Used when rewiring materials when running interactive RT session.
+		Attrs::PluginDesc pluginDesc(getPluginName(vopNode, "MtlStats"), "MtlRenderStats");
+		pluginDesc.addAttribute(Attrs::PluginAttr("base_mtl", material));
+		material = exportPlugin(pluginDesc);
+	}
+
+	return material;
+}
+
+VRay::Plugin VRayExporter::exportMaterial(OP_Node *matNode)
 {
 	VRay::Plugin material;
-	UT_ValArray<OP_Node *> mtlOutList;
-	if ( shop_node.getOpsByName("vray_material_output", mtlOutList) ) {
-		// there is at least 1 "vray_material_output" node so take the first one
-		VOP::MaterialOutput *mtlOut = static_cast< VOP::MaterialOutput * >( mtlOutList(0) );
-		addOpCallback(mtlOut, VRayExporter::RtCallbackSurfaceShop);
 
-		if (mtlOut->error() < UT_ERROR_ABORT ) {
-			Log::getLog().info("Exporting material output \"%s\"...",
-							   mtlOut->getName().buffer());
+	if (matNode) {
+		if (!objectExporter.getPluginFromCache(*matNode, material)) {
+			VOP_Node *vopNode = CAST_VOPNODE(matNode);
+			SHOP_Node *shopNode = CAST_SHOPNODE(matNode);
+			if (vopNode) {
+				addOpCallback(matNode, RtCallbackSurfaceShop);
 
-			const int idx = mtlOut->getInputFromName("Material");
-			OP_Node *inpNode = mtlOut->getInput(idx);
-			if (inpNode) {
-				VOP_Node *vopNode = inpNode->castToVOPNode();
-				if (vopNode) {
-					switch (mtlOut->getInputType(idx)) {
-						case VOP_SURFACE_SHADER: {
-							material = exportVop(vopNode);
-							break;
-						}
-						case VOP_TYPE_BSDF: {
-							VRay::Plugin pluginBRDF = exportVop(vopNode);
+				material = exportMaterial(vopNode);
+			}
+			else if (shopNode) {
+				const UT_String &opType = shopNode->getOperator()->getName();
+				if (opType.equal("principledshader")) {
+					material = exportPrincipledShader(*matNode);
+				}
+				else {
+					OP_Node *materialNode = getVRayNodeFromOp(*matNode, "Material");
+					if (materialNode) {
+						addOpCallback(matNode, RtCallbackSurfaceShop);
 
-							// Wrap BRDF into MtlSingleBRDF for RT GPU to work properly
-							Attrs::PluginDesc mtlPluginDesc(VRayExporter::getPluginName(vopNode, "Mtl"), "MtlSingleBRDF");
-							mtlPluginDesc.addAttribute(Attrs::PluginAttr("brdf", pluginBRDF));
-
-							material = exportPlugin(mtlPluginDesc);
-							break;
-						}
-						default:
-							Log::getLog().error("Unsupported input type for node \"%s\", input %d!",
-												mtlOut->getName().buffer(), idx);
-					}
-
-					if (material && isIPR()) {
-						// Wrap material into MtlRenderStats to always have the same material name
-						// Used when rewiring materials when running interactive RT session
-						Attrs::PluginDesc pluginDesc(VRayExporter::getPluginName(&shop_node, "Mtl"), "MtlRenderStats");
-
-						pluginDesc.addAttribute(Attrs::PluginAttr("base_mtl", material));
-						material = exportPlugin(pluginDesc);
+						material = exportMaterial(CAST_VOPNODE(materialNode));
 					}
 				}
 			}
+
+			objectExporter.addPluginToCache(*matNode, material);
 		}
 	}
-	else {
-		Log::getLog().error("Can't find \"V-Ray Material Output\" operator under \"%s\"!",
-							shop_node.getName().buffer());
-	}
 
-	if ( NOT(material) ) {
+	if (!material) {
 		material = exportDefaultMaterial();
 	}
 
@@ -112,13 +112,25 @@ VRay::Plugin VRayExporter::exportMaterial(SHOP_Node &shop_node)
 
 VRay::Plugin VRayExporter::exportDefaultMaterial()
 {
-	Attrs::PluginDesc brdfDesc("BRDFDiffuse@Clay", "BRDFDiffuse");
-	brdfDesc.addAttribute(Attrs::PluginAttr("color", 0.5f, 0.5f, 0.5f));
+	VRay::Plugin material;
 
-	Attrs::PluginDesc mtlDesc("Mtl@Clay", "MtlSingleBRDF");
-	mtlDesc.addAttribute(Attrs::PluginAttr("brdf", exportPlugin(brdfDesc)));
+	static const char clayMaterial[] = "Mtl@Clay";
 
-	return exportPlugin(mtlDesc);
+	if (!objectExporter.getPluginFromCache(clayMaterial, material)) {
+		Attrs::PluginDesc brdfDesc("BRDFDiffuse@Clay", "BRDFDiffuse");
+		brdfDesc.addAttribute(Attrs::PluginAttr("color", 0.5f, 0.5f, 0.5f));
+
+		Attrs::PluginDesc mtlDesc(clayMaterial, "MtlSingleBRDF");
+		mtlDesc.addAttribute(Attrs::PluginAttr("brdf", exportPlugin(brdfDesc)));
+		VRay::ValueList sceneName(1);
+		sceneName[0] = VRay::Value("DEFAULT_MATERIAL");
+		mtlDesc.addAttribute(Attrs::PluginAttr("scene_name", sceneName));
+		material = exportPlugin(mtlDesc);
+
+		objectExporter.addPluginToCache(clayMaterial, material);
+	}
+
+	return material;
 }
 
 
@@ -139,7 +151,7 @@ void VRayExporter::setAttrsFromSHOPOverrides(Attrs::PluginDesc &pluginDesc, VOP_
 	VOP_ParmGeneratorList prmVOPs;
 	vopNode.getParmInputs(prmVOPs);
 	for (VOP_ParmGenerator *prmVOP : prmVOPs) {
-		int inpidx = vopNode.whichInputIs(prmVOP);
+		const int inpidx = vopNode.whichInputIs(prmVOP);
 		if (inpidx < 0) {
 			continue;
 		}
@@ -155,15 +167,26 @@ void VRayExporter::setAttrsFromSHOPOverrides(Attrs::PluginDesc &pluginDesc, VOP_
 			continue;
 		}
 
-		UT_String prmToken = prmVOP->getParmNameCache();
-		const PRM_Parm *prm = creator->getParmList()->getParmPtr(prmToken);
-		// no such parameter on the parent SHOP node or
-		// parameter is not floating point
-		if (   NOT(prm)
-			|| NOT(prm->getType().isFloatType()) )
-		{
+		const UT_String &prmToken = prmVOP->getParmNameCache();
+
+		const PRM_Parm *prm = creator->getParmList()->getParmPtr(prmToken.buffer());
+		if (!prm)
 			continue;
+
+		const PRM_Type prmType = prm->getType();
+
+		if (prmType.isStringType()) {
+			UT_String path;
+			creator->evalString(path, prm, 0, t);
+
+			const VRay::Plugin opPlugin = exportNodeFromPath(path);
+			if (opPlugin) {
+				pluginDesc.addAttribute(Attrs::PluginAttr(attrName, opPlugin));
+			}
 		}
+
+		if (!prmType.isFloatType())
+			continue;
 
 		const Parm::AttrDesc &attrDesc = pluginInfo->attributes.at(attrName);
 		switch (attrDesc.value.type) {
@@ -205,6 +228,9 @@ void VRayExporter::setAttrsFromSHOPOverrides(Attrs::PluginDesc &pluginDesc, VOP_
 				}
 				mtlOverrideDesc.addAttribute(attr);
 				mtlOverrideDesc.addAttribute(Attrs::PluginAttr("user_attribute", prm->getToken()));
+
+				// Set priority to user attribute.
+				mtlOverrideDesc.addAttribute(Attrs::PluginAttr("attribute_priority", 1));
 
 				VRay::Plugin mtlOverridePlg = exportPlugin(mtlOverrideDesc);
 				pluginDesc.addAttribute(Attrs::PluginAttr(attrName, mtlOverridePlg, "color"));

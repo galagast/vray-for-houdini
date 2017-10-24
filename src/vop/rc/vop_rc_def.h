@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2015-2016, Chaos Software Ltd
+// Copyright (c) 2015-2017, Chaos Software Ltd
 //
 // V-Ray For Houdini
 //
@@ -18,7 +18,7 @@
 namespace VRayForHoudini {
 namespace VOP {
 
-#define RC_DEF(PluginID) NODE_BASE_DEF("RENDERCHANNEL", PluginID)
+#define RC_DEF(PluginID) NODE_BASE_DEF(RENDERCHANNEL, PluginID)
 
 RC_DEF(RenderChannelBumpNormals)
 RC_DEF(RenderChannelColor)
@@ -32,6 +32,8 @@ RC_DEF(RenderChannelRenderID)
 RC_DEF(RenderChannelVelocity)
 RC_DEF(RenderChannelZDepth)
 RC_DEF(RenderChannelDenoiser)
+RC_DEF(RenderChannelMultiMatte)
+RC_DEF(RenderChannelCryptomatte)
 
 } // namespace VOP
 } // namespace VRayForHoudini

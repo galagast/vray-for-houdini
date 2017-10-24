@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2015-2016, Chaos Software Ltd
+// Copyright (c) 2015-2017, Chaos Software Ltd
 //
 // V-Ray For Houdini
 //
@@ -21,7 +21,7 @@ void VOP::TextureOutput::addPrmTemplate(Parm::PRMList &prmTemplate)
 
 void VOP::TextureOutput::setPluginType()
 {
-	pluginType = "CUSTOM_TEXTURE";
+	pluginType = VRayPluginType::CUSTOM_TEXTURE;
 	pluginID   = "CustomTextureOutput";
 }
 

@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2015-2016, Chaos Software Ltd
+// Copyright (c) 2015-2017, Chaos Software Ltd
 //
 // V-Ray For Houdini
 //
@@ -69,7 +69,6 @@ struct MapChannel
 
 typedef std::unordered_map<std::string, MapChannel> MapChannels;
 
-
 typedef UT_ValArray< const GEO_Primitive* > GEOPrimList;
 typedef UT_Array< const GA_Attribute * >    GEOAttribList;
 
@@ -123,6 +122,8 @@ bool GEOgetDataFromAttribute(const GA_Attribute *attr, const GEOPrimList &primLi
 /// @retval true if successful
 bool GEOgetDataFromAttribute(const GA_Attribute *attr, const GEOPrimList &primList,
 							 VRay::VUtils::ColorRefList &data);
+
+exint getGEOPrimListHash(const GEOPrimList &primList);
 
 } // namespace VRayForHoudini
 

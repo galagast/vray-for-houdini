@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2015-2016, Chaos Software Ltd
+// Copyright (c) 2015-2017, Chaos Software Ltd
 //
 // V-Ray For Houdini
 //
@@ -14,11 +14,12 @@
 #include "vop_node_base.h"
 #include "vop_BRDFLayered.h"
 #include "vop_BRDFScanned.h"
+#include "vop_BRDFVRayMtl.h"
 
 namespace VRayForHoudini {
 namespace VOP {
 
-#define BRDF_DEF(PluginID) NODE_BASE_DEF("BRDF", PluginID)
+#define BRDF_DEF(PluginID) NODE_BASE_DEF(BRDF, PluginID)
 
 BRDF_DEF(BRDFBlinn)
 BRDF_DEF(BRDFBump)
@@ -27,7 +28,6 @@ BRDF_DEF(BRDFCarPaint)
 BRDF_DEF(BRDFCookTorrance)
 BRDF_DEF(BRDFDiffuse)
 BRDF_DEF(BRDFDiffuse_forSSS)
-BRDF_DEF(BRDFVRayMtl)
 BRDF_DEF(BRDFFlakes)
 BRDF_DEF(BRDFGGX)
 BRDF_DEF(BRDFGlass)

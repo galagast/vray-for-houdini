@@ -1,6 +1,38 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <shelfDocument>
 
+<tool name="driver_rop_vrayproxy" label="V-Ray Proxy ROP" icon="ROP_vray">
+    <readOnly/>
+    <toolMenuContext name="network">
+        <contextOpType>Driver/rop_vrayproxy</contextOpType>
+    </toolMenuContext>
+    <toolSubmenu>V-Ray</toolSubmenu>
+    <script scriptType="python">
+<![CDATA[
+
+import drivertoolutils
+drivertoolutils.genericTool(kwargs, 'rop_vrayproxy', nodename="vrayproxy")
+
+]]>
+    </script>
+</tool>
+
+<tool name="driver_rop_vray" label="V-Ray Renderer IPR" icon="ROP_vray">
+    <readOnly/>
+    <toolMenuContext name="network">
+        <contextOpType>Driver/vray</contextOpType>
+    </toolMenuContext>
+    <toolSubmenu>V-Ray</toolSubmenu>
+    <script scriptType="python">
+<![CDATA[
+
+import drivertoolutils
+drivertoolutils.genericTool(kwargs, 'vray', nodename="vray_ipr")
+
+]]>
+    </script>
+</tool>
+
 <tool name="driver_vray_renderer" label="V-Ray Renderer" icon="ROP_vray">
     <readOnly/>
     <toolMenuContext name="network">
@@ -18,7 +50,7 @@ drivertoolutils.genericTool(kwargs, 'vray_renderer', nodename="vray")
 </tool>
 
 
-<tool name="driver_vray_render_channels" label="V-Ray Render Channels" icon="ROP_vray">
+<tool name="driver_vray_render_channels" label="V-Ray Render Elements" icon="ROP_vray">
     <readOnly/>
     <toolMenuContext name="network">
         <contextOpType>Driver/vray_render_channels</contextOpType>
@@ -28,7 +60,7 @@ drivertoolutils.genericTool(kwargs, 'vray_renderer', nodename="vray")
 <![CDATA[
 
 import drivertoolutils
-drivertoolutils.genericTool(kwargs, 'vray_render_channels', nodename="render_channels")
+drivertoolutils.genericTool(kwargs, 'vray_render_channels', nodename="render_elements")
 
 ]]>
     </script>

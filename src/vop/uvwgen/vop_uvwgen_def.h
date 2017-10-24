@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2015-2016, Chaos Software Ltd
+// Copyright (c) 2015-2017, Chaos Software Ltd
 //
 // V-Ray For Houdini
 //
@@ -17,10 +17,9 @@
 namespace VRayForHoudini {
 namespace VOP {
 
-#define UVWGEN_DEF(PluginID) NODE_BASE_DEF("UVWGEN", PluginID)
+#define UVWGEN_DEF(PluginID) NODE_BASE_DEF(UVWGEN, PluginID)
 
 UVWGEN_DEF(UVWGenBercon)
-UVWGEN_DEF(UVWGenC4D)
 UVWGEN_DEF(UVWGenChannel)
 UVWGEN_DEF(UVWGenEnvironment)
 UVWGEN_DEF(UVWGenExplicit)

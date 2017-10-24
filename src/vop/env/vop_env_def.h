@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2015-2016, Chaos Software Ltd
+// Copyright (c) 2015-2017, Chaos Software Ltd
 //
 // V-Ray For Houdini
 //
@@ -18,7 +18,7 @@
 namespace VRayForHoudini {
 namespace VOP {
 
-#define ENV_DEF(PluginID) NODE_BASE_DEF("EFFECT", PluginID)
+#define ENV_DEF(PluginID) NODE_BASE_DEF(EFFECT, PluginID)
 
 ENV_DEF(EnvironmentFog)
 ENV_DEF(EnvFogMeshGizmo)

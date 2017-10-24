@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2015-2016, Chaos Software Ltd
+// Copyright (c) 2015-2017, Chaos Software Ltd
 //
 // V-Ray For Houdini
 //
@@ -18,7 +18,7 @@ using namespace VRayForHoudini;
 
 void VOP::RenderChannelsContainer::setPluginType()
 {
-	pluginType = "SETTINGS";
+	pluginType = VRayPluginType::SETTINGS;
 	pluginID   = "SettingsRenderChannels";
 }
 

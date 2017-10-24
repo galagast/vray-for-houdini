@@ -1,0 +1,86 @@
+
+group {
+    name "FolderVRayRendererSampler"
+    label "Sampler"
+
+    groupsimple {
+        name "SettingsImageSampler"
+        label "Image Sampler"
+#include "$VRAY_UI_DS_PATH/rop/SettingsImageSampler.ds"
+    }
+
+    groupsimple {
+        name "SettingsDMCSampler"
+        label "DMC Sampler"
+#include "$VRAY_UI_DS_PATH/rop/SettingsDMCSampler.ds"
+    }
+
+    groupsimple {
+        name "SettingsRegionsGenerator"
+        label "Render Region Division"
+#include "$VRAY_UI_DS_PATH/rop/SettingsRegionsGenerator.ds"
+
+        hidewhen "{ SettingsImageSampler_type == 3 }"
+    }
+	
+#include "$VRAY_UI_DS_PATH/rop/SettingsColorMapping.ds"
+}
+
+group {
+    name "FolderVRayRendererGI"
+    label "Global Illumination"
+#include "$VRAY_UI_DS_PATH/rop/SettingsGI.ds"
+#include "$VRAY_UI_DS_PATH/rop/SettingsIrradianceMap.ds"
+#include "$VRAY_UI_DS_PATH/rop/SettingsDMCGI.ds"
+#include "$VRAY_UI_DS_PATH/rop/SettingsLightCache.ds"
+#include "$VRAY_UI_DS_PATH/rop/SettingsCaustics.ds"
+
+}
+
+group {
+    name "FolderVRayRendererCamera"
+    label "Camera"
+#include "$VRAY_UI_DS_PATH/rop/SettingsCamera.ds"
+#include "$VRAY_UI_DS_PATH/rop/SettingsCameraDof.ds"
+#include "$VRAY_UI_DS_PATH/rop/SettingsMotionBlur.ds"
+#include "$VRAY_UI_DS_PATH/rop/VRayStereoscopicSettings.ds"
+
+}
+
+/*
+group {
+    name "SettingsColorMapping"
+    label "Color Mapping"
+#include "$VRAY_UI_DS_PATH/rop/SettingsColorMapping.ds"
+}
+*/
+
+group {
+    name "SettingsOptions"
+    label "Options"
+#include "$VRAY_UI_DS_PATH/rop/SettingsOptions.ds"
+#include "$VRAY_UI_DS_PATH/rop/SettingsRaycaster.ds"
+}
+
+/*
+group {
+    name "SettingsDefaultDisplacement"
+    label "Displacement"
+    disablewhen "{ SettingsOptions_geom_displacement == 0 }"
+#include "$VRAY_UI_DS_PATH/rop/SettingsDefaultDisplacement.ds"
+}
+*/
+
+
+group {
+    name "SettingsRTEngine"
+    label "RT"
+#include "$VRAY_UI_DS_PATH/rop/SettingsRTEngine.ds"
+}
+
+
+group {
+    name "VRaySettingsDR"
+    label "DR"
+#include "$VRAY_UI_DS_PATH/rop/DRItems.ds"
+}

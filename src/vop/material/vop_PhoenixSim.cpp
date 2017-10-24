@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2015-2016, Chaos Software Ltd
+// Copyright (c) 2015-2017, Chaos Software Ltd
 //
 // V-Ray For Houdini
 //
@@ -9,10 +9,13 @@
 //
 #ifdef CGR_HAS_AUR
 
-#include <vop_PhoenixSim.h>
-#include <vfh_prm_templates.h>
-#include <vfh_tex_utils.h>
-#include <gu_volumegridref.h>
+#include "vfh_prm_templates.h"
+#include "vfh_tex_utils.h"
+#include "vfh_hou_utils.h"
+#include "vfh_attr_utils.h"
+
+#include "vop_PhoenixSim.h"
+#include "gu_volumegridref.h"
 
 #include <UT/UT_IStream.h>
 #include <OP/OP_SaveFlags.h>
@@ -26,6 +29,8 @@
 #include <GU/GU_Detail.h>
 
 #include <utility>
+
+#include <QWidget>
 
 using namespace AurRamps;
 using namespace std;
@@ -105,8 +110,8 @@ struct RampContext {
 	/// @param type - the type of the data inside the context
 	RampContext(AurRamps::RampType type = AurRamps::RampType_None)
 		: m_ui(nullptr)
-		, m_uiType(type)
 		, m_freeUi(false)
+		, m_uiType(type)
 		, m_activeChan(CHANNEL_SMOKE)
 	{
 		for (int c = 0; c < CHANNEL_COUNT; ++c) {
@@ -210,7 +215,7 @@ struct RampContext {
 	std::unique_ptr<RampUi> m_ui;      ///< Pointer to the current UI, nullptr if not open
 	bool                    m_freeUi;  ///< Flag to mark the m_ui for deletion when OnWindowDie is called
 	AurRamps::RampType      m_uiType;  ///< Type is Color Curve or Both since there can be combined ramps
-	MinMaxMap               m_minMax; ///< min max value for each channel
+	MinMaxMap               m_minMax;  ///< min max value for each channel
 private:
 	typedef RampData RampPair[2];
 	RampChannel m_activeChan;          ///< The current active channel as selected in Houdini's UI
@@ -227,7 +232,7 @@ void RampHandler::OnEditCurveDiagram(RampUi & curve, OnEditType editReason)
 		return;
 	}
 	// sanity check
-	UT_ASSERT(&curve == m_ctx->m_ui);
+	UT_ASSERT(&curve == m_ctx->m_ui.get());
 
 	auto & data = m_ctx->data(RampType_Curve);
 	const auto size = curve.pointCount(RampType_Curve);
@@ -256,7 +261,7 @@ void RampHandler::OnEditColorGradient(RampUi & curve, OnEditType editReason)
 		return;
 	}
 	// sanity check
-	UT_ASSERT(&curve == m_ctx->m_ui);
+	UT_ASSERT(&curve == m_ctx->m_ui.get());
 
 	auto & data = m_ctx->data(RampType_Color);
 	const auto size = curve.pointCount(RampType_Color);
@@ -387,25 +392,29 @@ void PhxShaderSim::setRampDefaults()
 }
 
 
-void PhxShaderSim::initPreset(const char * presetName)
+int PhxShaderSim::setPresetTypeCB(void *data, int index, fpreal64 time, const PRM_Template *tplate)
 {
 	const int chanCount = RampContext::CHANNEL_COUNT;
+	auto simNode = reinterpret_cast<PhxShaderSim*>(data);
 
-	clearRampData();
-	setRampDefaults();
+	UT_String presetName;
+	simNode->evalString(presetName, tplate->getToken(), 0, time);
+
+	simNode->clearRampData();
+	simNode->setRampDefaults();
 
 	// presets
-	if (!strcmp(presetName, "FumeFX")) {
+	if (presetName == "FumeFX") {
 		// channel is fuel
 		// fire ramps
-		auto & ecolorRamp = m_ramps["ecolor_ramp"]->data(RampType_Color, RampContext::RampChannel::CHANNEL_FUEL);
+		auto & ecolorRamp = simNode->m_ramps["ecolor_ramp"]->data(RampType_Color, RampContext::RampChannel::CHANNEL_FUEL);
 		ecolorRamp.m_xS.clear();
 		ecolorRamp.m_yS.clear();
 		ecolorRamp.m_interps.clear();
 
 		addColorPoint(ecolorRamp, 0.1f, 1.f, 0.33f, 0.f, AurRamps::MCPT_Spline);
 
-		auto & epowerCurve = m_ramps["elum_curve"]->data(RampType_Curve, RampContext::RampChannel::CHANNEL_FUEL); 
+		auto & epowerCurve = simNode->m_ramps["elum_curve"]->data(RampType_Curve, RampContext::RampChannel::CHANNEL_FUEL);
 		epowerCurve.m_xS.clear();
 		epowerCurve.m_yS.clear();
 		epowerCurve.m_interps.clear();
@@ -414,11 +423,11 @@ void PhxShaderSim::initPreset(const char * presetName)
 		addCurvePoint(epowerCurve, 0.100, 1.000, AurRamps::MCPT_Linear);
 		addCurvePoint(epowerCurve, 0.200, 0.130, AurRamps::MCPT_Linear);
 		addCurvePoint(epowerCurve, 1.000, 0.100, AurRamps::MCPT_Linear);
-	} else if (!strcmp(presetName, "HoudiniVolume")) {
+	} else if (presetName == "HoudiniVolume") {
 		// channel is temp
 		// fire ramps
 
-		auto & ecolorRamp = m_ramps["ecolor_ramp"]->data(RampType_Color, RampContext::RampChannel::CHANNEL_TEMPERATURE);
+		auto & ecolorRamp = simNode->m_ramps["ecolor_ramp"]->data(RampType_Color, RampContext::RampChannel::CHANNEL_TEMPERATURE);
 		ecolorRamp.m_xS.clear();
 		ecolorRamp.m_yS.clear();
 		ecolorRamp.m_interps.clear();
@@ -428,20 +437,20 @@ void PhxShaderSim::initPreset(const char * presetName)
 		addColorPoint(ecolorRamp, 13.0f, 1.0, 0.88, 0.0, AurRamps::MCPT_Spline);
 		addColorPoint(ecolorRamp, 14.0f, 1.0, 1.00, 1.0, AurRamps::MCPT_Spline);
 
-		auto & epowerCurve = m_ramps["elum_curve"]->data(RampType_Curve, RampContext::RampChannel::CHANNEL_TEMPERATURE); 
+		auto & epowerCurve = simNode->m_ramps["elum_curve"]->data(RampType_Curve, RampContext::RampChannel::CHANNEL_TEMPERATURE);
 		epowerCurve.m_xS.clear();
 		epowerCurve.m_yS.clear();
 		epowerCurve.m_interps.clear();
 
 		addCurvePoint(epowerCurve,  0.01, 0.000, AurRamps::MCPT_Spline);
 		addCurvePoint(epowerCurve, 14.00, 1.000, AurRamps::MCPT_Spline);
-	} else if (!strcmp(presetName, "HoudiniLiquid")) {
+	} else if (presetName == "HoudiniLiquid") {
 
-	} else if (!strcmp(presetName, "MayaFluids")) {
+	} else if (presetName == "MayaFluids") {
 		// channel is temp
 		// fire ramps
 
-		auto & ecolorRamp = m_ramps["ecolor_ramp"]->data(RampType_Color, RampContext::RampChannel::CHANNEL_TEMPERATURE);
+		auto & ecolorRamp = simNode->m_ramps["ecolor_ramp"]->data(RampType_Color, RampContext::RampChannel::CHANNEL_TEMPERATURE);
 		ecolorRamp.m_xS.clear();
 		ecolorRamp.m_yS.clear();
 		ecolorRamp.m_interps.clear();
@@ -451,7 +460,7 @@ void PhxShaderSim::initPreset(const char * presetName)
 		addColorPoint(ecolorRamp, 3.5f, 1.37, 1.00, 0.00, AurRamps::MCPT_Spline);
 		addColorPoint(ecolorRamp, 4.0f, 1.56, 1.56, 0.98, AurRamps::MCPT_Spline);
 
-		auto & epowerCurve = m_ramps["elum_curve"]->data(RampType_Curve, RampContext::RampChannel::CHANNEL_TEMPERATURE); 
+		auto & epowerCurve = simNode->m_ramps["elum_curve"]->data(RampType_Curve, RampContext::RampChannel::CHANNEL_TEMPERATURE);
 		epowerCurve.m_xS.clear();
 		epowerCurve.m_yS.clear();
 		epowerCurve.m_interps.clear();
@@ -460,7 +469,7 @@ void PhxShaderSim::initPreset(const char * presetName)
 		addCurvePoint(epowerCurve, 4.5, 1.000, AurRamps::MCPT_Spline);
 
 		// smoke opacity
-		auto & transpCurve = m_ramps["transp_curve"]->data(RampType_Curve, RampContext::RampChannel::CHANNEL_SMOKE);
+		auto & transpCurve = simNode->m_ramps["transp_curve"]->data(RampType_Curve, RampContext::RampChannel::CHANNEL_SMOKE);
 		transpCurve.m_xS.clear();
 		transpCurve.m_yS.clear();
 		transpCurve.m_interps.clear();
@@ -471,6 +480,7 @@ void PhxShaderSim::initPreset(const char * presetName)
 		addCurvePoint(transpCurve, 0.110, 0.83, AurRamps::MCPT_Spline);
 		addCurvePoint(transpCurve, 0.440, 0.95, AurRamps::MCPT_Spline);
 	}
+	return 1;
 }
 
 
@@ -500,7 +510,69 @@ int PhxShaderSim::rampDropDownDependCB(void * data, int index, fpreal64 time, co
 }
 
 
-int PhxShaderSim::rampButtonClickCB(void *data, int index, fpreal64 time, const PRM_Template *tplate)
+void PhxShaderSim::loadDataRanges()
+{
+	const char * token = "selectedSopPath";
+	const VRayVolumeGridRef::MinMaxPair zeroMinMax = {0, 0};
+	// zero out all min/max ranges
+	for (auto &rampIter : m_ramps) {
+		if (auto ramp = rampIter.second) {
+			for (int c = 0; c < RampContext::CHANNEL_COUNT; c++) {
+				ramp->m_minMax[c] = zeroMinMax;
+			}
+			ramp->refreshUi();
+		}
+	}
+
+	UT_String sopPath;
+	evalString(sopPath, token, 0, 0);
+
+	SOP_Node *cacheSop = getSOPNodeFromPath(sopPath);
+	if (!cacheSop || !cacheSop->getOperator()->getName().startsWith("VRayNodePhxShaderCache")) {
+		Log::getLog().warning("Only a V-Ray PhxShaderCache sop can be selected!");
+		return;
+	}
+
+	OP_Context context(CHgetEvalTime());
+	GU_DetailHandleAutoReadLock gdl(cacheSop->getCookedGeoHandle(context));
+	if (!gdl.isValid()) {
+		return;
+	}
+	const GU_Detail &detail = *gdl.getGdp();
+	auto &primList = detail.getPrimitiveList();
+	const int primCount = primList.offsetSize();
+
+	const GA_Primitive *volumePrim = nullptr;
+	// check all primities if we have a VRayVolumeGridRef
+	for (int c = 0; c < primCount; ++c) {
+		auto prim = primList.get(c);
+		if (prim && prim->getTypeId() == VRayVolumeGridRef::typeId()) {
+			volumePrim = prim;
+			break;
+		}
+	}
+
+	if (!volumePrim) {
+		Log::getLog().warning("Selected SOP does not contain a VRayNodePhxShaderCache node!");
+		return;
+	}
+
+	auto *packedPrim = UTverify_cast<const GU_PrimPacked*>(volumePrim);
+	const auto *impl = reinterpret_cast<const VRayVolumeGridRef*>(packedPrim->implementation());
+	const auto &ranges = impl->getChannelDataRanges();
+
+	for (auto &rampIter : m_ramps) {
+		if (auto ramp = rampIter.second) {
+			for (int c = 0; c < RampContext::CHANNEL_COUNT; c++) {
+				ramp->m_minMax[c] = ranges[RampContext::rampChannelToPhxChannel(static_cast<RampContext::RampChannel>(c + 1))];
+			}
+			ramp->refreshUi();
+		}
+	}
+}
+
+
+int PhxShaderSim::rampButtonClickCB(void *data, int, fpreal64, const PRM_Template *tplate)
 {
 	using namespace std;
 	using namespace AurRamps;
@@ -513,6 +585,7 @@ int PhxShaderSim::rampButtonClickCB(void *data, int index, fpreal64 time, const 
 	const string token = tplate->getToken();
 
 	auto simNode = reinterpret_cast<PhxShaderSim*>(data);
+	simNode->loadDataRanges();
 	auto ctx = simNode->m_ramps[token];
 
 	// this should not happen - calling callback on uninited context
@@ -524,6 +597,10 @@ int PhxShaderSim::rampButtonClickCB(void *data, int index, fpreal64 time, const 
 	if (ctx->m_freeUi) {
 		ctx->m_ui.reset(nullptr);
 		ctx->m_freeUi = false;
+	} else if (ctx->m_ui) {
+		ctx->m_ui->close();
+		ctx->m_ui.reset(nullptr);
+		return 0;
 	}
 
 	if (ctx->m_freeUi) {
@@ -543,7 +620,13 @@ int PhxShaderSim::rampButtonClickCB(void *data, int index, fpreal64 time, const 
 	}
 
 	ctx->m_ui.reset(RampUi::createRamp(tplate->getLabel(), ctx->m_uiType, 200, 200, 300, height, app));
-
+	QWidget *windowHandle = reinterpret_cast<QWidget*>(ctx->m_ui->getWindowHande());
+	if (windowHandle) {
+		windowHandle->setParent(HOU::getMainQtWindow());
+		Qt::WindowFlags windowFlags = windowHandle->windowFlags();
+		windowFlags |= (Qt::Window | Qt::WindowStaysOnTopHint);
+		windowHandle->setWindowFlags(windowFlags);
+	}
 	// set ramp data to the ramp window, it will be kept in sycn via the callbacks
 	if (ctx->m_uiType & RampType_Curve) {
 		auto & curveData = ctx->data(RampType_Curve);
@@ -569,68 +652,11 @@ int PhxShaderSim::rampButtonClickCB(void *data, int index, fpreal64 time, const 
 }
 
 
-int PhxShaderSim::setVopPathCB(void *data, int index, fpreal64 time, const PRM_Template *tplate)
+int PhxShaderSim::setVopPathCB(void *data, int, fpreal64, const PRM_Template *)
 {
-	const auto token = tplate->getToken();
 	auto simNode = reinterpret_cast<PhxShaderSim*>(data);
-	const VRayVolumeGridRef::MinMaxPair zeroMinMax = {0, 0};
-	// zero out all min/max ranges
-	for (auto &rampIter : simNode->m_ramps) {
-		if (auto ramp = rampIter.second) {
-			for (int c = 0; c < RampContext::CHANNEL_COUNT; c++) {
-				ramp->m_minMax[c] = zeroMinMax;
-			}
-			ramp->refreshUi();
-		}
-	}
-
-	UT_String sopPath;
-	simNode->evalString(sopPath, token, 0, 0);
-	auto cacheSop = OPgetDirector()->findSOPNode(sopPath.buffer());
-
-	if (!cacheSop || !cacheSop->getOperator()->getName().startsWith("VRayNodePhxShaderCache")) {
-		Log::getLog().warning("Only a V-Ray PhxShaderCache sop can be selected!");
-		return 0;
-	}
-
-	OP_Context context(CHgetEvalTime());
-	GU_DetailHandleAutoReadLock gdl(cacheSop->getCookedGeoHandle(context));
-	if (!gdl.isValid()) {
-		return 0;
-	}
-	const GU_Detail &detail = *gdl.getGdp();
-	auto &primList = detail.getPrimitiveList();
-	const int primCount = primList.offsetSize();
-
-	const GA_Primitive *volumePrim = nullptr;
-	// check all primities if we have a VRayVolumeGridRef
-	for (int c = 0; c < primCount; ++c) {
-		auto prim = primList.get(c);
-		if (prim && prim->getTypeId() == VRayVolumeGridRef::typeId()) {
-			volumePrim = prim;
-			break;
-		}
-	}
-
-	if (!volumePrim) {
-		Log::getLog().warning("Selected SOP does not contain a VRayNodePhxShaderCache node!");
-		return 0;
-	}
-
-	auto *packedPrim = UTverify_cast<const GU_PrimPacked*>(volumePrim);
-	const auto *impl = reinterpret_cast<const VRayVolumeGridRef*>(packedPrim->implementation());
-	const auto &ranges = impl->getChannelDataRanges();
-
-	for (auto &rampIter : simNode->m_ramps) {
-		if (auto ramp = rampIter.second) {
-			for (int c = 0; c < RampContext::CHANNEL_COUNT; c++) {
-				ramp->m_minMax[c] = ranges[RampContext::rampChannelToPhxChannel(static_cast<RampContext::RampChannel>(c + 1))];
-			}
-			ramp->refreshUi();
-		}
-	}
-
-	return 0;
+	simNode->loadDataRanges();
+	return 1;
 }
 
 
@@ -646,6 +672,8 @@ PRM_Template* PhxShaderSim::GetPrmTemplate()
 			auto & param = AttrItems[c];
 			if (!strcmp(param.getToken(), "selectedSopPath")) {
 				param.setCallback(setVopPathCB);
+			} else if (!strcmp(param.getToken(), "setPresetParam")) {
+				param.setCallback(setPresetTypeCB);
 			}
 
 			const auto spareData = param.getSparePtr();
@@ -912,7 +940,7 @@ bool PhxShaderSim::loadRamps(UT_IStream & is)
 
 void PhxShaderSim::setPluginType()
 {
-	pluginType = "MATERIAL";
+	pluginType = VRayPluginType::MATERIAL;
 	pluginID   = "PhxShaderSim";
 }
 

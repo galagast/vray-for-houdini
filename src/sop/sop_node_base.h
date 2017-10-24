@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2015-2016, Chaos Software Ltd
+// Copyright (c) 2015-2017, Chaos Software Ltd
 //
 // V-Ray For Houdini
 //
@@ -20,7 +20,6 @@
 #include <SOP/SOP_Node.h>
 
 #include "vfh_vray.h"
-
 
 namespace VRayForHoudini {
 namespace SOP {

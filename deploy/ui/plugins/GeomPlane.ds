@@ -1,6 +1,14 @@
 {
-    name	GeomPlane
-label	"Infinite Plane"
-parmtag	{ spare_category "Infinite Plane" }
-parmtag	{ vray_plugin "GeomPlane" }
+    name    GeomPlane
+    label   "Infinite Plane"
+    parmtag { spare_category "Infinite Plane" }
+    parmtag { vray_plugin "GeomPlane" }
+
+    parm {
+        name "plane_size"
+        label "Viewport Size"
+        type float
+        default { 2.0 }
+        parmtag { "cook_dependent" "1" }
+    }
 }
