@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2015-2016, Chaos Software Ltd
+// Copyright (c) 2015-2017, Chaos Software Ltd
 //
 // V-Ray For Houdini
 //
@@ -10,6 +10,8 @@
 
 #ifndef VRAY_FOR_HOUDINI_VFH_ERROR_H
 #define VRAY_FOR_HOUDINI_VFH_ERROR_H
+
+#ifndef VASSERT_ENABLED
 
 #include <exception>
 
@@ -49,4 +51,5 @@ private:
 } // namespace Error
 } // namespace VRayForHoudini
 
+#endif // VASSERT_ENABLED
 #endif // VRAY_FOR_HOUDINI_VFH_ERROR_H

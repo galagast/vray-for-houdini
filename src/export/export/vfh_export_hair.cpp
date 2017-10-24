@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2015-2016, Chaos Software Ltd
+// Copyright (c) 2015-2017, Chaos Software Ltd
 //
 // V-Ray For Houdini
 //
@@ -9,60 +9,33 @@
 //
 
 #include "vfh_export_hair.h"
+#include "vfh_exporter.h"
 #include "vfh_geoutils.h"
 
 #include <GEO/GEO_PrimPoly.h>
 
-
 using namespace VRayForHoudini;
+using namespace VRayForHoudini::Attrs;
 
+const char* const theHairParm = "geom_splines";
+const char* const VFH_ATTRIB_INCANDESCENCE = "incandescence";
+const char* const VFH_ATTRIB_TRANSPARENCY = "transparency";
 
-namespace {
+HairPrimitiveExporter::HairPrimitiveExporter(OBJ_Node &obj, OP_Context &ctx, VRayExporter &exp, const GEOPrimList &primList)
+	: PrimitiveExporter(obj, ctx, exp)
+	, primList(primList)
+{}
 
-const char * const theHairParm = "geom_splines";
-
-const char * const VFH_ATTRIB_INCANDESCENCE = "incandescence";
-const char * const VFH_ATTRIB_TRANSPARENCY = "transparency";
-
-}
-
-
-bool HairPrimitiveExporter::isHairPrimitive(const GEO_Primitive *prim)
+OP_Node* HairPrimitiveExporter::findPramOwnerForHairParms(OBJ_Node &objNode)
 {
-	if (!prim) {
-		return false;
-	}
-	return (   prim->getTypeId() == GEO_PRIMNURBCURVE
-			|| prim->getTypeId() == GEO_PRIMBEZCURVE
-			|| (prim->getTypeId() == GEO_PRIMPOLY && !(UTverify_cast< const GEO_PrimPoly* >(prim)->isClosed())) );
-}
-
-
-bool HairPrimitiveExporter::containsHairPrimitives(const GU_Detail &gdp)
-{
-	return (   gdp.containsPrimitiveType(GEO_PRIMNURBCURVE)
-			|| gdp.containsPrimitiveType(GEO_PRIMBEZCURVE)
-			|| gdp.containsPrimitiveType(GEO_PRIMPOLY) );
-}
-
-
-HairPrimitiveExporter::HairPrimitiveExporter(OBJ_Node &obj, OP_Context &ctx, VRayExporter &exp):
-	PrimitiveExporter(obj, ctx, exp)
-{ }
-
-
-OP_Node* HairPrimitiveExporter::findPramOwnerForHairParms() const
-{
-	if (   m_object.getParmList()
-		&& m_object.getParmList()->getParmPtr(theHairParm))
-	{
-		 return &m_object;
+	if (objNode.getParmList() && objNode.getParmList()->getParmPtr(theHairParm)) {
+		 return &objNode;
 	}
 
-	OP_Node *obj = m_object.getParent();
-	if (   obj
-		&& obj->getOperator()->getName().contains("fur*")
-		&& obj->getParmList()->getParmPtr(theHairParm) )
+	OP_Node *obj = objNode.getParent();
+	if (obj &&
+		obj->getOperator()->getName().contains("fur*") &&
+		obj->getParmList()->getParmPtr(theHairParm) )
 	{
 		 return obj;
 	}
@@ -70,28 +43,9 @@ OP_Node* HairPrimitiveExporter::findPramOwnerForHairParms() const
 	return nullptr;
 }
 
-
 bool HairPrimitiveExporter::asPluginDesc(const GU_Detail &gdp, Attrs::PluginDesc &pluginDesc)
 {
-	if (!containsHairPrimitives(gdp)) {
-		// no hair primitives
-		return false;
-	}
-
-	// filter primitives
-	GEOPrimList primList(  gdp.countPrimitiveType(GEO_PRIMNURBCURVE)
-						 + gdp.countPrimitiveType(GEO_PRIMBEZCURVE)
-						 + gdp.countPrimitiveType(GEO_PRIMPOLY));
-
-	for (GA_Iterator jt(gdp.getPrimitiveRange()); !jt.atEnd(); jt.advance()) {
-		const GEO_Primitive *prim = gdp.getGEOPrimitive(*jt);
-		if (isHairPrimitive(prim)) {
-			primList.append(prim);
-		}
-	}
-
-	if (primList.size() <= 0) {
-		// no valid hair primitives
+	if (!primList.size()) {
 		return false;
 	}
 
@@ -109,16 +63,14 @@ bool HairPrimitiveExporter::asPluginDesc(const GU_Detail &gdp, Attrs::PluginDesc
 	VRay::VUtils::VectorRefList verts(nVerts);
 	GEOgetDataFromAttribute(gdp.getP(), primList, verts);
 
-	pluginDesc.pluginID = "GeomMayaHair";
-	pluginDesc.pluginName = VRayExporter::getPluginName(&m_object, "Hair");
 	pluginDesc.addAttribute(Attrs::PluginAttr("num_hair_vertices", strands));
 	pluginDesc.addAttribute(Attrs::PluginAttr("hair_vertices", verts));
 
-	OP_Node *prmOwner = findPramOwnerForHairParms();
+	OP_Node *prmOwner = findPramOwnerForHairParms(objNode);
 	if (prmOwner) {
 		// found parent node with hair rendering parameters set
 		// so update plugin description with those parameters
-		m_exporter.setAttrsFromOpNodePrms(pluginDesc, prmOwner);
+		pluginExporter.setAttrsFromOpNodePrms(pluginDesc, prmOwner);
 	}
 	else {
 		// no hair rendering parameters found - use defaults
@@ -227,46 +179,25 @@ bool HairPrimitiveExporter::asPluginDesc(const GU_Detail &gdp, Attrs::PluginDesc
 			}
 		}
 	}
-
+	// NOTE: Channel index 0 is used for UVW coordinates if and _only_ if strand_uvw is not set.
 	if (mapChannels.size()) {
 		VRay::VUtils::ValueRefList map_channels(mapChannels.size());
-		int idx = 0;
+		int channelIdx = 0;
 		for (const auto &mc : mapChannels) {
 			const MapChannel &mapChannel = mc.second;
 			// Channel data
 			VRay::VUtils::ValueRefList map_channel(4);
-			map_channel[0].setDouble(idx);
+			map_channel[0].setDouble(channelIdx);
 			map_channel[1].setListInt(mapChannel.faces);
 			map_channel[2].setListVector(mapChannel.vertices);
 			map_channel[3].setString(mapChannel.name.c_str());
 
-			map_channels[idx].setList(map_channel);
-			++idx;
+			map_channels[channelIdx].setList(map_channel);
+			++channelIdx;
 		}
 
 		pluginDesc.addAttribute(Attrs::PluginAttr("map_channels", map_channels));
 	}
 
 	return true;
-}
-
-
-void HairPrimitiveExporter::exportPrimitives(const GU_Detail &gdp, PluginDescList &plugins)
-{
-	if (!containsHairPrimitives(gdp)) {
-		// no hair primitives
-		return;
-	}
-
-	// export
-	Attrs::PluginDesc hairDesc;
-	if (!asPluginDesc(gdp, hairDesc)) {
-		// no valid hair primitives
-		return;
-	}
-
-	plugins.push_back(Attrs::PluginDesc("", "Node"));
-	Attrs::PluginDesc &nodeDesc = plugins.back();
-
-	nodeDesc.addAttribute(Attrs::PluginAttr("geometry", m_exporter.exportPlugin(hairDesc)));
 }

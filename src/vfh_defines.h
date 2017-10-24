@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2015-2016, Chaos Software Ltd
+// Copyright (c) 2015-2017, Chaos Software Ltd
 //
 // V-Ray For Houdini
 //
@@ -17,6 +17,9 @@
 #ifndef QT_NO_KEYWORDS
 #  define QT_NO_KEYWORDS
 #endif
+#ifdef Q_FOREACH
+#  undef Q_FOREACH
+#endif
 
 #define STRINGIZE_NX(A) #A
 #define STRINGIZE(A) STRINGIZE_NX(A)
@@ -24,8 +27,17 @@
 
 #define StrEq(nameA, nameB) (vutils_strcmp(nameA, nameB) == 0)
 
-#define FreePtr(p)    if (p) { delete    p; p = nullptr; }
-#define FreePtrArr(p) if (p) { delete [] p; p = nullptr; }
+template<typename T>
+void FreePtr(T* &p) {
+	delete p;
+	p = nullptr;
+}
+
+template<typename T>
+void FreePtrArr(T* &p) {
+	delete [] p;
+	p = nullptr;
+}
 
 template <typename T, int N>
 char (&ArraySizeHelper(T (&array)[N]))[N];
@@ -42,5 +54,8 @@ char (&ArraySizeHelper(T (&array)[N]))[N];
 private: \
 	cls(const cls&); \
 	cls& operator=(const cls&);
+
+#define FOR_IT(type, itName, var) int itName##Idx = 0; for (type::iterator itName = var.begin(); itName != var.end(); ++itName, ++itName##Idx)
+#define FOR_CONST_IT(type, itName, var) int itName##Idx = 0; for (type::const_iterator itName = var.begin(); itName != var.end(); ++itName, ++itName##Idx)
 
 #endif // VRAY_FOR_HOUDINI_UTIL_DEFINES_H

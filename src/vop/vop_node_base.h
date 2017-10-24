@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2015-2016, Chaos Software Ltd
+// Copyright (c) 2015-2017, Chaos Software Ltd
 //
 // V-Ray For Houdini
 //
@@ -61,6 +61,8 @@ public:
 
 	virtual unsigned          maxOutputs() const VRAY_OVERRIDE;
 
+	VOP_Type getShaderType() const VRAY_OVERRIDE;
+
 protected:
 	/// Returns the internal name of the supplied input. This input name is
 	/// used when the code generator substitutes variables return by getCode.
@@ -86,6 +88,8 @@ protected:
 	/// this method should return valid vop types even when nothing is
 	/// connected to the corresponding input.
 	virtual void              getAllowedInputTypeInfosSubclass(unsigned idx, VOP_VopTypeInfoArray &type_infos) VRAY_OVERRIDE;
+	void getAllowedInputTypesSubclass(unsigned idx, VOP_VopTypeArray &voptypes) VRAY_OVERRIDE;
+	bool willAutoconvertInputType(int input_idx) VRAY_OVERRIDE;
 
 private:
 	bool                      hasPluginInfo() const;
@@ -98,12 +102,14 @@ class OpPluginID: \
 		public NodeBase \
 { \
 public: \
-	OpPluginID(OP_Network *parent, const char *name, OP_Operator *entry):NodeBase(parent, name, entry) {} \
+	OpPluginID(OP_Network *parent, const char *name, OP_Operator *entry) \
+		: NodeBase(parent, name, entry) \
+	{} \
 	virtual ~OpPluginID() {} \
 protected: \
 	virtual void setPluginType() VRAY_OVERRIDE { \
-		pluginType = OpPluginType; \
-		pluginID   = STRINGIZE(OpPluginID); \
+		pluginType = VRayPluginType::OpPluginType; \
+		pluginID = STRINGIZE(OpPluginID); \
 	} \
 };
 

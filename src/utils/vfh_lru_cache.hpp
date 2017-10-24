@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2015-2016, Chaos Software Ltd
+// Copyright (c) 2015-2017, Chaos Software Ltd
 //
 // V-Ray For Houdini
 //
@@ -7,6 +7,9 @@
 //
 // Full license text: https://github.com/ChaosGroup/vray-for-houdini/blob/master/LICENSE
 //
+
+#ifndef VRAY_FOR_HOUDINI_LRU_CACHE_H
+#define VRAY_FOR_HOUDINI_LRU_CACHE_H
 
 #include "vfh_defines.h"
 
@@ -106,6 +109,27 @@ public:
 
 	~LRUCache()
 	{ clear(); }
+
+	LRUCache(LRUCache&& source) :
+		m_capacity(defaultCapacity),
+		m_cacheMap(defaultCapacity),
+		m_mlruQueue(0)
+	{
+		*this = std::move(source);
+	}
+
+	LRUCache &operator=(LRUCache&& source)
+	{
+		if (&source != this) {
+			std::swap(m_capacity, source.m_capacity);
+			std::swap(m_cacheMap, source.m_cacheMap);
+			std::swap(m_mlruQueue, source.m_mlruQueue);
+			std::swap(m_cbfetchValue, source.m_cbfetchValue);
+			std::swap(m_cbEvictValue, source.m_cbEvictValue);
+		}
+
+		return *this;
+	}
 
 	/// Get cache capacity
 	size_type capacity() const { return m_capacity; }
@@ -298,7 +322,7 @@ public:
 private:
 	///	avoid copying
 	LRUCache(const LRUCache& other);
-	LRUCache &operator =(const LRUCache& other);
+	LRUCache &operator=(const LRUCache& other);
 
 private:
 	size_type m_capacity; ///< Maximum item that will be held in the cache
@@ -565,3 +589,4 @@ private:
 }  // namespace Caches
 }  // namespace VRayForHoudini
 
+#endif // VRAY_FOR_HOUDINI_LRU_CACHE_H

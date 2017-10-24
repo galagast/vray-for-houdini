@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2015-2016, Chaos Software Ltd
+// Copyright (c) 2015-2017, Chaos Software Ltd
 //
 // V-Ray For Houdini
 //
@@ -22,9 +22,6 @@ namespace VOP {
 class MtlMulti:
 		public VOP::NodeBase
 {
-public:
-	static void           addPrmTemplate(Parm::PRMList &prmTemplate);
-
 public:
 	MtlMulti(OP_Network *parent, const char *name, OP_Operator *entry):NodeBase(parent, name, entry) {}
 	virtual              ~MtlMulti() {}

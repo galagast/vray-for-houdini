@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2015-2016, Chaos Software Ltd
+// Copyright (c) 2015-2017, Chaos Software Ltd
 //
 // V-Ray For Houdini
 //
@@ -16,15 +16,13 @@ using namespace VRayForHoudini;
 
 void VOP::GeomStaticSmoothedMesh::setPluginType()
 {
-	pluginType = "GEOMETRY";
+	pluginType = VRayPluginType::GEOMETRY;
 	pluginID   = "GeomStaticSmoothedMesh";
 }
 
 
 OP::VRayNode::PluginResult VOP::GeomStaticSmoothedMesh::asPluginDesc(Attrs::PluginDesc &pluginDesc, VRayExporter &exporter, ExportContext *parentContext)
 {
-	Log::getLog().warning("OP::GeomStaticSmoothedMesh::asPluginDesc()");
-
 	ECFnOBJNode fnObjContext(parentContext);
 	if (NOT(fnObjContext.isValid())) {
 		return OP::VRayNode::PluginResultError;

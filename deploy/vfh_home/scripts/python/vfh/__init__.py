@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2015-2016, Chaos Software Ltd
+# Copyright (c) 2015-2017, Chaos Software Ltd
 #
 # V-Ray For Houdini
 #
@@ -14,4 +14,7 @@ __all__ = [
     'vfh_rop',
     'vfh_camera',
     'vfh_json',
+    'vfh_proxy_import',
+    'vfh_show_all_vfb',
+    'vfh_phoenix_presets',
 ]

@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2015-2016, Chaos Software Ltd
+// Copyright (c) 2015-2017, Chaos Software Ltd
 //
 // V-Ray For Houdini
 //
@@ -11,15 +11,13 @@
 #ifndef VRAY_FOR_HOUDINI_EXPORTER_H
 #define VRAY_FOR_HOUDINI_EXPORTER_H
 
-#include "vfh_defines.h"
 #include "vfh_typedefs.h"
 #include "vfh_vray.h"
 #include "vfh_plugin_exporter.h"
 #include "vfh_plugin_info.h"
 #include "vfh_export_view.h"
-#include "vfh_vfb.h"
-#include "vfh_log.h"
-
+#include "vfh_hashes.h"
+#include "vfh_export_geom.h"
 
 #include "vfh_export_context.h"
 
@@ -27,12 +25,44 @@
 #include <OBJ/OBJ_Node.h>
 #include <ROP/ROP_Node.h>
 
-#include <unordered_map>
-
-
 namespace VRayForHoudini {
 
 class VRayRendererNode;
+
+enum class ReturnValue {
+	Error,
+	Success
+};
+
+enum class VRayPluginID {
+	SunLight = 0,
+	LightDirect,
+	LightAmbient,
+	LightOmni,
+	LightSphere,
+	LightSpot,
+	LightRectangle,
+	LightMesh,
+	LightIES,
+	LightDome,
+	VRayClipper,
+	MAX_PLUGINID
+};
+
+enum class VRayPluginType {
+	UNKNOWN = 0,
+	GEOMETRY,
+	LIGHT,
+	BRDF,
+	MATERIAL,
+	TEXTURE,
+	CUSTOM_TEXTURE,
+	UVWGEN,
+	RENDERCHANNEL,
+	EFFECT,
+	OBJECT,
+	SETTINGS,
+};
 
 enum VRayLightType {
 	VRayLightOmni      = 0,
@@ -42,46 +72,19 @@ enum VRayLightType {
 	VRayLightSun       = 8,
 };
 
-
 struct OpInterestItem {
-	OpInterestItem():
-		op_node(nullptr),
-		cb(nullptr),
-		cb_data(nullptr)
+	OpInterestItem(OP_Node *op_node=nullptr, OP_EventMethod cb=nullptr, void *cb_data=nullptr)
+		: op_node(op_node)
+		, cb(cb)
+		, cb_data(cb_data)
 	{}
 
-	OpInterestItem(OP_Node *op_node, OP_EventMethod cb, void *cb_data):
-		op_node(op_node),
-		cb(cb),
-		cb_data(cb_data)
-	{}
-
-	OP_Node        *op_node;
-	OP_EventMethod  cb;
-	void           *cb_data;
+	OP_Node *op_node;
+	OP_EventMethod cb;
+	void *cb_data;
 };
+
 typedef std::vector<OpInterestItem> CbItems;
-
-
-struct MotionBlurParams {
-	MotionBlurParams()
-		: mb_geom_samples(1)
-		, mb_duration(0.)
-		, mb_interval_center(0.)
-	{}
-
-	void   calcParams(fpreal currFrame);
-
-	int    mb_geom_samples;
-	/// (fpreal) motion blur duration in frames
-	fpreal mb_duration;
-	/// (fpreal) motion blur interval center in frames
-	fpreal mb_interval_center;
-
-	fpreal mb_start;
-	fpreal mb_end;
-	fpreal mb_frame_inc;
-};
 
 /// Vfh main exporter. This is the main class responsible for translating
 /// Houdini geometry and nodes to V-Ray plugins, intilizing and starting
@@ -97,10 +100,15 @@ public:
 		ExpExport, ///< export a vrscene
 	};
 
-	VRayExporter(VRayRendererNode *rop);
-	~VRayExporter();
+	enum IprMode {
+		iprModeNone = 0,
+		iprModeRT,
+		iprModeSOHO,
+	};
 
-public:
+	explicit VRayExporter(OP_Node *rop);
+	virtual ~VRayExporter();
+
 	/// Create and initilize or reset the V-Ray renderer instance.
 	/// This will stop currently running rendering (if any).
 	/// @param hasUI[in] - true to enable the VFB, false if VFB is not needed
@@ -119,18 +127,26 @@ public:
 
 	/// Gather data for camera settings
 	/// @param camera[in] - the active camera
-	/// @param rop[in] - the rop node invoking the rendering
 	/// @param viewParams[out] - collects camera settings
-	void fillCameraData(const OBJ_Node &camera, const OP_Node &rop, ViewParams &viewParams);
+	void fillViewParamFromCameraNode(const OBJ_Node &camera, ViewParams &viewParams);
 
 	/// Gather data for motion blur
 	/// @param viewParams[out] - collects motion blur settings
-	void fillSettingsMotionBlur(ViewParams &viewParams);
+	ReturnValue fillSettingsMotionBlur(ViewParams &viewParams, Attrs::PluginDesc &settingsMotionBlur);
 
 	/// Fill in physical camera settings
 	/// @param viewParams[in] - holds data for camera settings
 	/// @param pluginDesc[out] - physical camera plugin description
 	void fillPhysicalCamera(const ViewParams &viewParams, Attrs::PluginDesc &pluginDesc);
+
+	/// Recreates physical camera
+	/// @param viewParams View settings.
+	/// @param needRemoval If plugin has to be removed.
+	VRay::Plugin exportPhysicalCamera(const ViewParams &viewParams, int needRemoval=true);
+
+	/// Exports RenderView plugin.
+	/// @param viewParams View settings.
+	void exportRenderView(const ViewParams &viewParams);
 
 	/// Fill in depth of field settings
 	/// @param viewParams[in] - holds data for camera settings
@@ -163,12 +179,20 @@ public:
 
 	/// Fill in output settings
 	/// @param pluginDesc[out] - output settings plugin description
-	void fillSettingsOutput(Attrs::PluginDesc &pluginDesc);
+	ReturnValue fillSettingsOutput(Attrs::PluginDesc &pluginDesc);
 
 	/// Export camera related settings - camera, dof, motion blur, etc.
 	/// This is called once for each frame we want to render
 	/// @retval 0 on success
 	int exportView();
+
+	/// Export view from the specified view parameters.
+	/// Used in SOHO IPR.
+	/// @param viewParams View parameters
+	ReturnValue exportView(const ViewParams &viewParams);
+
+	/// Returns current view parameters.
+	const ViewParams &getViewParams() const { return m_viewParams; }
 
 	/// Export the actual scene - geometry, materials, lights, environment,
 	/// volumes and render channels. This is called once for each frame we
@@ -177,7 +201,7 @@ public:
 
 	/// Export global renderer settings - color mapping, gi, irradiance cache, etc.
 	/// This is called once when a render session is initililzed.
-	void exportSettings();
+	ReturnValue exportSettings();
 
 	/// Export active lights in the scene
 	/// This is called once for each frame we want to render
@@ -198,6 +222,8 @@ public:
 	/// @param op_node[in] - environment VOP node
 	void exportEffects(OP_Node *op_net);
 
+	void setTime(fpreal time);
+
 	/// Export scene at a given time
 	/// This is called once for each frame we want to render
 	void exportFrame(fpreal time);
@@ -207,13 +233,11 @@ public:
 
 	/// Export OBJ_geometry node
 	/// @retval V-Ray plugin created for that node
-	VRay::Plugin exportObject(OBJ_Node *obj_node);
+	VRay::Plugin exportObject(OP_Node *opNode);
 
 	/// Export VRayClipper node
 	/// @retval V-Ray plugin created for that node
 	VRay::Plugin exportVRayClipper(OBJ_Node &clipperNode);
-
-	VRay::Plugin exportParticles(OBJ_Node *dop_network);
 
 	/// Fill in displacement/subdivision render properties for the given node
 	/// @param obj_node[in] - the OBJ_Geometry node
@@ -227,23 +251,22 @@ public:
 	/// @retval V-Ray displacement/subdivision plugin
 	VRay::Plugin exportDisplacement(OBJ_Node *obj_node, VRay::Plugin &geomPlugin);
 
-	/// Export OBJ_Light node
-	/// @retval V-Ray plugin created for that node
-	VRay::Plugin exportLight(OBJ_Node *obj_node);
-
 	/// Export VOP node
-	/// @retval V-Ray plugin created for that node
-	VRay::Plugin exportVop(OP_Node *op_node, ExportContext *parentContext = nullptr);
+	/// @param opNode VOP node instance.
+	/// @return V-Ray plugin.
+	VRay::Plugin exportVop(OP_Node *opNode, ExportContext *parentContext=nullptr);
 
 	/// Export Make transform VOP node
 	/// @retval V-Ray transform for that node
 	VRay::Transform exportTransformVop(VOP_Node &vop_node, ExportContext *parentContext = nullptr);
 
-	/// Export V-Ray material SHOP network
-	/// @retval V-Ray surface material plugin for that node
-	VRay::Plugin exportMaterial(SHOP_Node &shop_node);
+	/// Export V-Ray material from SHOP network or VOP node.
+	/// @param node SHOP or VOP node.
+	/// @returns V-Ray plugin.
+	VRay::Plugin exportMaterial(OP_Node *node);
 
 	/// Export the default light created when there are no lights in the scene
+	/// NOTE: will use the m_viewParams.renderView.tm for tm of the headlight - it must be set (exportView) before callign this method
 	/// @param update[in] - flags whether this is called from IPR callback
 	/// @retval V-Ray plugin for default light
 	VRay::Plugin exportDefaultHeadlight(bool update = false);
@@ -253,6 +276,42 @@ public:
 	/// @retval V-Ray plugin for default material
 	VRay::Plugin exportDefaultMaterial();
 
+	/// Exports node from "op:" or file path.
+	/// @param path String value: file or node path.
+	VRay::Plugin exportNodeFromPath(const UT_String &path);
+
+	///	Exports COP node as RawBitmapBuffer.
+	/// @param copNode COP2 node.
+	VRay::Plugin exportCopNodeBitmapBuffer(COP2_Node &copNode);
+
+	/// Default mapping type.
+	enum DefaultMappingType {
+		defaultMappingChannel = 0,
+		defaultMappingChannelName,
+		defaultMappingSpherical,
+		defaultMappingTriPlanar,
+	};
+
+	/// Fills defualt settings for default mapping.
+	void fillDefaultMappingDesc(DefaultMappingType mappingType, Attrs::PluginDesc &uvwgenDesc);
+
+	/// Exports image texture from "op:" or file path.
+	/// @param path String value: file or node path.
+	/// @param mappingType Default mapping type.
+	VRay::Plugin exportNodeFromPathWithDefaultMapping(const UT_String &path, DefaultMappingType mappingType);
+
+	///	Exports COP node as TexBitmap.
+	/// @param copNode COP2 node.
+	/// @param mappingType Default mapping type.
+	VRay::Plugin exportCopNodeWithDefaultMapping(COP2_Node &copNode, DefaultMappingType mappingType);
+
+	///	Exports file path as RawBitmapBuffer.
+	/// @param filePath File path.
+	VRay::Plugin exportFileTextureBitmapBuffer(const UT_String &filePath);
+
+	/// Exports file path as TexBitmap with default mapping.
+	/// @param filePath File path.
+	VRay::Plugin exportFileTextureWithDefaultMapping(const UT_String &filePath, DefaultMappingType mappingType);
 
 #ifdef CGR_HAS_VRAYSCENE
 	VRay::Plugin exportVRayScene(OBJ_Node *obj_node, SOP_Node *geom_node);
@@ -261,7 +320,7 @@ public:
 	/// Create or update a plugin from a plugin description
 	/// @param pluginDesc - plugin description with relevant properties set
 	/// @retval invalid Plugin object if not successul
-	VRay::Plugin exportPlugin(const Attrs::PluginDesc &pluginDesc);
+	virtual VRay::Plugin exportPlugin(const Attrs::PluginDesc &pluginDesc);
 
 	/// Update a plugin properties from a plugin description
 	/// @param plugin - the plugin to update
@@ -277,13 +336,17 @@ public:
 	int exportVrscene(const std::string &filepath, VRay::VRayExportSettings &settings);
 
 	/// Delete plugins created for the given OBJ node.
-	void removePlugin(OBJ_Node *node);
+	void removePlugin(OBJ_Node *node, int checkExisting=true);
 
 	/// Delete plugin with the given name
-	void removePlugin(const std::string &pluginName);
+	void removePlugin(const std::string &pluginName, int checkExisting=true);
 
 	/// Delete plugin for the plugin description
-	void removePlugin(const Attrs::PluginDesc &pluginDesc);
+	void removePlugin(const Attrs::PluginDesc &pluginDesc, int checkExisting=true);
+
+	/// Delete plugin.
+	/// @param plugin V-Ray plugin instance.
+	void removePlugin(VRay::Plugin plugin);
 
 	/// Start rendering at the current time. This will do different this depending on
 	/// the work mode of the exporter- export vrscene, render or both
@@ -301,14 +364,11 @@ public:
 	/// @retval 0 - no error
 	int renderSequence(int start, int end, int step, int locked=false);
 
-	void clearKeyFrames(float toTime);
+	void clearKeyFrames(double toTime);
 
 	/// Set if we are exporting animation
 	/// @note also used for motion blur
 	void setAnimation(bool on);
-
-	/// Set current export time
-	void setCurrentTime(fpreal time);
 
 	/// Set if we are exporting for IPR
 	void setIPR(int isIPR);
@@ -323,7 +383,7 @@ public:
 	void setWorkMode(ExpWorkMode mode);
 
 	/// Set current export context
-	void setContext(const OP_Context &ctx);
+	void setContext(const VRayOpContext &ctx);
 
 	/// Abort rendering at first possible time
 	void setAbort();
@@ -335,13 +395,22 @@ public:
 	void setSettingsRtEngine();
 
 	/// Get current export context
-	OP_Context& getContext() { return m_context; }
+	VRayOpContext &getContext() { return m_context; }
+
+	/// Get current export context
+	const VRayOpContext &getContext() const { return m_context; }
 
 	/// Get vfh plugin renderer
 	VRayPluginRenderer& getRenderer() { return m_renderer; }
 
-	/// Get the V-Ray ROP bound to this exporter
-	VRayRendererNode& getRop() { return *m_rop; }
+	/// Set the V-Rap ROP bound to this exporter
+	void setRopPtr(OP_Node *value) { m_rop = value; }
+
+	/// Get pointer to the bound V-Ray ROP
+	OP_Node* getRopPtr() { return m_rop; }
+
+	/// Get pointer to the bound V-Ray ROP
+	const OP_Node * getRopPtr() const { return m_rop; }
 
 	/// Get ROP error code. This is called from the V-Ray ROP on every frame
 	/// to check if rendering should be aborted
@@ -365,14 +434,10 @@ public:
 
 	/// Test if we are using physical camera
 	/// @param camera[in] - camera object to read parameters from
-	int isPhysicalView(const OBJ_Node &camera) const;
+	PhysicalCameraMode usePhysicalCamera(const OBJ_Node &camera) const;
 
 	/// Test if a node is animated
 	int isNodeAnimated(OP_Node *op_node);
-
-	/// Test if a ligth is enabled i.e. its enabled flag is on,
-	/// intensity is > 0 or its a forced light on the V-Ray ROP
-	int isLightEnabled(OP_Node *op_node);
 
 	/// Test if velocity channels is enabled
 	/// @param rop[in] - the V-Ray ROP to test for velocity channel enabled
@@ -385,6 +450,9 @@ public:
 
 	/// Show VFB if renderer is started and VFB is enabled
 	void showVFB();
+
+	/// Reset exporter / renderer.
+	void reset();
 
 	/// Helper functions to retrieve the input node given an input connection name
 	/// @param op_node[in] - VOP node
@@ -404,8 +472,10 @@ public:
 	/// @param prefix[in] - name prefix
 	/// @param suffix[in] - name suffix
 	/// @retval plugin name
+	static std::string getPluginName(const OP_Node &opNode, const char *prefix);
 	static std::string getPluginName(OP_Node *op_node, const std::string &prefix="", const std::string &suffix="");
 	static std::string getPluginName(OBJ_Node *obj_node);
+	static std::string getPluginName(OBJ_Node &obj_node);
 
 	/// Helper function to get the active camera from a given ROP node
 	/// @param rop[in] - the ROP node
@@ -416,7 +486,7 @@ public:
 	/// @param obj[in] - the OBJ node
 	/// @param t[in] - evaluation time for the paremeter
 	/// @retval the SHOP node
-	static SHOP_Node* getObjMaterial(OBJ_Node *obj, fpreal t=0.0);
+	static OP_Node *getObjMaterial(OBJ_Node *objNode, fpreal t=0.0);
 
 	/// Helper function to get OBJ node transform as VRay::Transform
 	/// @param obj[in] - the OBJ node
@@ -479,6 +549,8 @@ public:
 	VRay::Plugin exportConnectedVop(VOP_Node *vop_node, int inpidx, ExportContext *parentContext = nullptr);
 	VRay::Plugin exportConnectedVop(VOP_Node *vop_node, const UT_String &inputName, ExportContext *parentContext = nullptr);
 
+	VRay::Plugin exportPrincipledShader(OP_Node &opNode, ExportContext *parentContext=nullptr);
+
 	/// Export input parameter VOPs for a given VOP node as V-Ray user textures.
 	/// Default values for the textures will be queried from the corresponding
 	/// SHOP parameter. Exported user textures are added as attibutes to the plugin
@@ -493,11 +565,29 @@ public:
 	/// @param sim[in] - the volumetric data plugin
 	void phxAddSimumation(VRay::Plugin sim);
 
+	/// Returns object exporter.
+	ObjectExporter& getObjectExporter() { return objectExporter; }
+
 private:
-	VRayRendererNode              *m_rop; ///< the ROP node bound to this exporter
-	UI::VFB                        m_vfb; ///< a lightweigth frame buffer window showing the rendered image, when we don't want V-Ray VFB
+	/// Export V-Ray material from VOP node.
+	/// @param node VOP node.
+	/// @returns V-Ray plugin.
+	VRay::Plugin exportMaterial(VOP_Node *node);
+
+	/// Saves VFB state.
+	void saveVfbState();
+
+	/// Restores VFB state.
+	void restoreVfbState();
+
+	/// Executed when user presses "Render" button in the VFB.
+	void renderLast();
+
+	/// The driver node bound to this exporter.
+	OP_Node *m_rop;
+
 	VRayPluginRenderer             m_renderer; ///< the plugin renderer
-	OP_Context                     m_context; ///< current export context
+	VRayOpContext                  m_context; ///< current export context
 	int                            m_renderMode; ///< rend
 	int                            m_isAborted; ///< flag whether rendering should be aborted when possible
 	ViewParams                     m_viewParams; ///< used to gather view data from the ROP and camera
@@ -505,7 +595,7 @@ private:
 	ROP_RENDER_CODE                m_error; ///< ROP error to singnal the ROP rendering should be aborted
 	ExpWorkMode                    m_workMode; ///< what should the exporter do- export vrscene, render or both
 	CbItems                        m_opRegCallbacks; ///< holds registered node callbacks for live IPR updates
-	VRay::ValueList                m_phxSimulations; ///< accumulates volumetric data to pass to PhxShaderSimVol
+	Hash::PluginHashSet            m_phxSimulations; ///< accumulates volumetric data to pass to PhxShaderSimVol
 	int                            m_isIPR; ///< if we are rendering in IPR mode, i.e. we are tracking live node updates
 	int                            m_isGPU; ///< if we are using RT GPU rendering engine
 	int                            m_isAnimation; ///< if we should export the scene at more than one time
@@ -514,6 +604,12 @@ private:
 	fpreal                         m_timeStart; ///< start time for the export
 	fpreal                         m_timeEnd; ///< end time for the export
 	FloatSet                       m_exportedFrames; ///< set of time points at which the scene has already been exported
+
+	/// Object exporter.
+	ObjectExporter objectExporter;
+
+	/// Frame buffer settings.
+	VFBSettings vfbSettings;
 
 public:
 	/// Register event callback for a given node. This callback will be invoked when
@@ -547,7 +643,6 @@ public:
 	void onAbort(VRay::VRayRenderer &renderer);
 
 	/// Callbacks for tracking changes on different types of nodes
-	static void RtCallbackObjManager(OP_Node *caller, void *callee, OP_EventType type, void *data);
 	static void RtCallbackLight(OP_Node *caller, void *callee, OP_EventType type, void *data);
 	static void RtCallbackOBJGeometry(OP_Node *caller, void *callee, OP_EventType type, void *data);
 	static void RtCallbackSOPChanged(OP_Node *caller, void *callee, OP_EventType type, void *data);
@@ -559,7 +654,18 @@ public:
 	static void RtCallbackDisplacementObj(OP_Node *caller, void *callee, OP_EventType type, void *data);
 	static void RtCallbackVRayClipper(OP_Node *caller, void *callee, OP_EventType type, void *data);
 
+	/// A lock for callbacks.
+	static VUtils::FastCriticalSection csect;
 };
+
+const char *getVRayPluginIDName(VRayPluginID pluginID);
+
+int getFrameBufferType(OP_Node &rop);
+int getRendererMode(OP_Node &rop);
+int getRendererIprMode(OP_Node &rop);
+VRayExporter::ExpWorkMode getExporterWorkMode(OP_Node &rop);
+
+int isBackground();
 
 } // namespace VRayForHoudini
 

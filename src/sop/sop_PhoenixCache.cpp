@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2015-2016, Chaos Software Ltd
+// Copyright (c) 2015-2017, Chaos Software Ltd
 //
 // V-Ray For Houdini
 //
@@ -12,7 +12,6 @@
 
 #include "sop_PhoenixCache.h"
 #include "vfh_prm_templates.h"
-#include "gu_volumegridref.h"
 
 #include <GU/GU_PrimVolume.h>
 #include <GU/GU_PrimPacked.h>
@@ -36,32 +35,19 @@ PRM_Template* SOP::PhxShaderCache::GetPrmTemplate()
 	return AttrItems;
 }
 
-
-void SOP::PhxShaderCache::setPluginType()
+void SOP::PhxShaderCache::updateVRayVolumeGridRefPrim(VRayVolumeGridRef *gridRefPtr, GU_PrimPacked *pack, OP_Context &context, const float t)
 {
-	pluginType = "GEOMETRY";
-	pluginID   = "CustomPhxShaderCache";
-}
+	if (!gridRefPtr) {
+		// if we don't have previous gridref use the new one
+		gridRefPtr = UTverify_cast<VRayVolumeGridRef*>(pack->implementation());
+	}
+	else {
+		// if we have previous gridref move its cache to the new one
+		VRayVolumeGridRef::VolumeCache &newCachedData = UTverify_cast<VRayVolumeGridRef*>(pack->implementation())->getCachedData();
+		newCachedData = std::move(gridRefPtr->getCachedData());
+		delete gridRefPtr;
 
-
-
-OP_ERROR SOP::PhxShaderCache::cookMySop(OP_Context &context)
-{
-	Log::getLog().info("%s cookMySop(%.3f)",
-					   getName().buffer(), context.getTime());
-
-	flags().setTimeDep(true);
-
-	gdp->stashAll();
-
-	const float t = context.getTime();
-
-	// Create a packed primitive
-	GU_PrimPacked *pack = GU_PrimPacked::build(*gdp, "VRayVolumeGridRef");
-	auto gridRefPtr = UTverify_cast<VRayVolumeGridRef*>(pack->implementation());
-	if (NOT(pack)) {
-		addWarning(SOP_MESSAGE, "Can't create packed primitive VRayVolumeGridRef");
-		return error();
+		gridRefPtr = UTverify_cast<VRayVolumeGridRef*>(pack->implementation());
 	}
 
 	// Set the location of the packed primitive's point.
@@ -76,18 +62,56 @@ OP_ERROR SOP::PhxShaderCache::cookMySop(OP_Context &context)
 		options.setOptionFromTemplate(this, prm, *prm.getTemplatePtr(), t);
 	}
 
+	// Check if file contains frame pattern "$F". If it does,
+	// then we need to replace it with Phoenix compatible pattern (####).
 	UT_String raw, parsed;
 	evalStringRaw(raw, "cache_path", 0, t);
-	evalString(parsed, "cache_path", 0, t);
-
-	// we check if the user actually entered frame number in the path like 021.vdb or he used $F3.vdb and frame is 21
-	// if user hardcoded frame num we should export constant path and not replace with ### for PHX
-	options.setOptionB("literal_cache_path", raw == parsed);
+	options.setOptionB("literal_cache_path", !raw.findString("$F", false, false));
 
 	options.setOptionF("current_frame", context.getFloatFrame());
 
 	gridRefPtr->update(options);
 	pack->setPathAttribute(getFullPath());
+}
+
+
+void SOP::PhxShaderCache::setPluginType()
+{
+	pluginType = VRayPluginType::GEOMETRY;
+	pluginID   = "CustomPhxShaderCache";
+}
+
+
+
+OP_ERROR SOP::PhxShaderCache::cookMySop(OP_Context &context)
+{
+	flags().setTimeDep(true);
+
+	const float t = context.getTime();
+	
+	const GA_PrimitiveTypeId vrayVolumeGridRefTypeId = GU_PrimPacked::lookupTypeId("VRayVolumeGridRef");
+
+	// find existing VRayVolumeGridRef primitive
+	VRayVolumeGridRef* gridRefPtr = nullptr;
+	GA_Primitive *prim = nullptr;
+	GA_FOR_ALL_PRIMITIVES(gdp, prim) {
+		if (prim->getTypeId() == vrayVolumeGridRefTypeId) {
+			GU_PrimPacked *primPacked = UTverify_cast<GU_PrimPacked*>(prim);
+			VRayVolumeGridRef *oldGridRefPtr = UTverify_cast<VRayVolumeGridRef*>(primPacked->implementation());
+			gridRefPtr = new VRayVolumeGridRef(std::move(*oldGridRefPtr));
+		}
+	}
+	
+	gdp->stashAll();
+	
+	// Create a packed primitive
+	GU_PrimPacked *pack = GU_PrimPacked::build(*gdp, "VRayVolumeGridRef");
+	if (pack) {
+		updateVRayVolumeGridRefPrim(gridRefPtr, pack, context, t);
+	}
+	else {
+		addWarning(SOP_MESSAGE, "Can't create packed primitive VRayVolumeGridRef");
+	}
 
 	gdp->destroyStashed();
 

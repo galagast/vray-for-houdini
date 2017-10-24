@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2015-2016, Chaos Software Ltd
+// Copyright (c) 2015-2017, Chaos Software Ltd
 //
 // V-Ray For Houdini
 //
@@ -11,16 +11,10 @@
 #ifndef VRAY_FOR_HOUDINI_TYPEDEFS_H
 #define VRAY_FOR_HOUDINI_TYPEDEFS_H
 
-// #include <boost/algorithm/string/replace.hpp>
-
-#include <string>
-#include <vector>
-#include <map>
 #include <set>
+#include <string>
 
-
-typedef std::set<std::string>     StringSet;
-typedef std::vector<std::string>  StringVector;
-typedef std::set<float>           FloatSet;
+typedef std::set<std::string> StringSet;
+typedef std::set<float> FloatSet;
 
 #endif // VRAY_FOR_HOUDINI_TYPEDEFS_H
